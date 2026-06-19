@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Model weights (large; download separately)
+server/weights/*
+!server/weights/.gitkeep
+
+# Env / secrets
+.env
+*.local
+
+# Node / extension build
+node_modules/
+extension/dist/
+extension/.vite/
+
+# Misc
+.DS_Store
+*.log

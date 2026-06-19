@@ -1,0 +1,28 @@
+services:
+  forge:
+    build: .
+    image: immich-forge:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Model weights live on the host so the image stays small.
+      - ./weights:/app/weights
+    # Requires the NVIDIA Container Toolkit on the host.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    # If your Immich stack is on another compose network, attach it here so
+    # IMMICH_BASE_URL can use the service name. Otherwise point at the host IP.
+    # networks:
+    #   - immich_default
+
+# networks:
+#   immich_default:
+#     external: true

@@ -1,0 +1,17 @@
+# Heavy GPU / deep-learning deps. Installed in the Docker image on top of the
+# CUDA base. torch is pulled from the CUDA wheel index in the Dockerfile.
+#
+# NOTE: DeOldify pins older fastai/torch and frequently conflicts with the
+# others. If you hit resolver conflicts, run colorization in its own container
+# and keep this file for upscale + face restore only.
+
+# Real-ESRGAN upscaling
+realesrgan==0.3.0
+basicsr==1.4.2
+
+# Face restoration (CodeFormer shares GFPGAN's runtime; facexlib does detection)
+gfpgan==1.3.8
+facexlib==0.3.0
+
+# Colorization
+# deoldify   # uncomment and pin against its required fastai/torch, ideally isolated
