@@ -7,32 +7,48 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .compat import patch_basicsr_torchvision
+
 log = logging.getLogger("forge.upscale")
 
 
 class Upscaler:
     """Lazy-loaded upscaler. `backend` selects the implementation."""
 
-    def __init__(self, backend: str, weights_dir: Path, device: str, tile: int):
+    def __init__(
+        self, backend: str, weights_dir: Path, device: str, tile: int,
+        max_output_pixels: int = 0,
+    ):
         self.backend = backend
         self.weights_dir = weights_dir
         self.device = device
         self.tile = tile
-        self._model = None  # RealESRGANer, loaded on first use
+        self.max_output_pixels = max_output_pixels
+        self._model = None                       # cached on successful load
+        self._disabled = backend != "realesrgan"  # permanent: backend off / libs absent
+        self._warned_missing = False             # warn once, not every call
 
     def _load_realesrgan(self):
-        """Load Real-ESRGAN. Returns None if the lib/weights are unavailable."""
+        """Load Real-ESRGAN. Returns None if the lib/weights aren't (yet) available."""
+        weights = self.weights_dir / "RealESRGAN_x4plus.pth"
+        if not weights.exists():
+            # Transient — retry if the weight is added later (no restart needed).
+            if not self._warned_missing:
+                log.warning("missing %s; upscaling with lanczos until present", weights)
+                self._warned_missing = True
+            return None
+
         try:
+            patch_basicsr_torchvision()  # must precede the basicsr/realesrgan import
             import torch
             from basicsr.archs.rrdbnet_arch import RRDBNet
             from realesrgan import RealESRGANer
-        except ImportError:
-            log.warning("realesrgan/basicsr not installed; falling back to lanczos")
-            return None
-
-        weights = self.weights_dir / "RealESRGAN_x4plus.pth"
-        if not weights.exists():
-            log.warning("missing %s; falling back to lanczos", weights)
+        except ImportError as exc:
+            # Log the real exception — "not installed" vs the torchvision
+            # functional_tensor removal vs a numpy-2 incompatibility look very
+            # different and need different fixes.
+            log.warning("Real-ESRGAN unavailable, using lanczos: %r", exc)
+            self._disabled = True  # permanent for this process
             return None
 
         model = RRDBNet(
@@ -50,13 +66,29 @@ class Upscaler:
             device=self.device if half else "cpu",
         )
 
+    def _effective_factor(self, img: np.ndarray, factor: int) -> int:
+        """Clamp the upscale factor so the output stays under max_output_pixels."""
+        if self.max_output_pixels <= 0:
+            return factor
+        h, w = img.shape[:2]
+        allowed = int((self.max_output_pixels / (h * w)) ** 0.5)
+        allowed = max(1, min(factor, allowed))
+        if allowed < factor:
+            log.warning(
+                "clamping upscale x%d -> x%d: source %dx%d would exceed %d output px",
+                factor, allowed, w, h, self.max_output_pixels,
+            )
+        return allowed
+
     def __call__(self, img: np.ndarray, factor: int) -> np.ndarray:
-        if self.backend == "realesrgan":
-            if self._model is None:
-                self._model = self._load_realesrgan() or "lanczos"
-            if self._model != "lanczos":
-                out, _ = self._model.enhance(img, outscale=factor)
-                return out
+        factor = self._effective_factor(img, factor)
+        if factor <= 1:
+            return img  # source already at/over the output cap; leave as-is
+        if self._model is None and not self._disabled:
+            self._model = self._load_realesrgan()
+        if self._model is not None:
+            out, _ = self._model.enhance(img, outscale=factor)
+            return out
         # Fallback: classical Lanczos resize.
         h, w = img.shape[:2]
         return cv2.resize(

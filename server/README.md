@@ -10,9 +10,14 @@ Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud
 
 ```bash
 cp .env.example .env        # set IMMICH_BASE_URL, IMMICH_API_KEY, FORGE_API_TOKEN
-python scripts/download_weights.py   # optional; enables the deep backends
 docker compose up --build
 ```
+
+On first boot the container downloads the model weights into the mounted
+`weights/` volume (idempotent — subsequent starts are instant). Set
+`FORGE_SKIP_WEIGHT_DOWNLOAD=1` to bypass this and pre-populate `weights/`
+yourself (e.g. air-gapped hosts). The `basicsr` `functional_tensor` import is
+patched at build time so Real-ESRGAN / GFPGAN import cleanly.
 
 ## Run locally without a GPU (fallback mode)
 
@@ -62,15 +67,28 @@ curl -s -X POST $API/forge/$JOB/accept -H "Authorization: Bearer $TOKEN" | jq
 
 ## Pipeline order
 
-`colorize → upscale → face_restore`, all exchanging BGR uint8 ndarrays. A single
-GPU semaphore serializes jobs so concurrent requests don't OOM the card. Large
-images are tiled (`FORGE_TILE_SIZE`).
+`colorize → face_restore → upscale`, all exchanging BGR uint8 ndarrays. Face
+restore runs *before* upscale so face detection works on the original-resolution
+image — detecting faces on a 4×-upscaled (~300MP) image OOMs the GPU. Upscale is
+last and tiled (`FORGE_TILE_SIZE`).
 
-## Swapping in real models
+A single GPU semaphore serializes jobs, the CUDA cache is freed between stages,
+and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS`
+(default 100MP) — e.g. a 19MP source requested at ×4 is clamped to ×2.
 
-1. `python scripts/download_weights.py` (or drop `.pth` files into `weights/`).
-2. Set `FORGE_*_BACKEND` env vars.
-3. For face restore / colorize, finish the integration points marked in
-   `app/pipeline/face_restore.py` and `app/pipeline/colorize.py` (kept optional
-   because their deps are heavy and version-sensitive — DeOldify especially is
-   best isolated in its own container).
+## Models
+
+| Stage | Backend | Source |
+|-------|---------|--------|
+| upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `realesrgan` + `RealESRGAN_x4plus.pth` |
+| face restore | GFPGAN (`gfpgan` \| `codeformer` \| `none`) | pip `gfpgan` + `GFPGANv1.4.pth` |
+| colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
+
+DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
+`basicsr`/`timm` dependency, so it doesn't collide with the `basicsr` Real-ESRGAN
+uses. DeOldify was the original plan but needs fastai 1.x / torch 1.x, which is
+incompatible with the torch 2.x this image runs on.
+
+Each backend falls back to a classical/no-op impl when its weights are missing.
+To enable the deep models: `python scripts/download_weights.py` (or the
+container does it on first boot), then set the `FORGE_*_BACKEND` env vars.

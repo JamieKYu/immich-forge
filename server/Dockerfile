@@ -3,7 +3,8 @@ FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11 python3-pip python3.11-dev \
@@ -31,8 +32,20 @@ COPY requirements-ml.txt .
 RUN pip install --no-build-isolation -r requirements-ml.txt || \
     echo "WARN: ML deps failed to install; server will use classical fallbacks"
 
+# basicsr 1.4.2 (a dep of realesrgan/gfpgan) imports
+# `torchvision.transforms.functional_tensor`, which was removed in torchvision
+# 0.17+. Rewrite the import in the installed package so `import realesrgan` /
+# gfpgan work in any context (the runtime shim in app/pipeline/compat.py is a
+# secondary backup for non-Docker runs).
+RUN find /usr/local/lib/python3.11/dist-packages/basicsr -name '*.py' \
+      -exec sed -i \
+      's/torchvision\.transforms\.functional_tensor/torchvision.transforms.functional/g' {} + \
+    || echo "basicsr not installed; skipping import patch"
+
 COPY app ./app
 COPY scripts ./scripts
+RUN chmod +x scripts/entrypoint.sh
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Ensures model weights are present, then launches uvicorn.
+CMD ["/app/scripts/entrypoint.sh"]

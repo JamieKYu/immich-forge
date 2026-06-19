@@ -19,8 +19,8 @@ WEIGHTS = {
     "GFPGANv1.4.pth": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.4/GFPGANv1.4.pth",
     # CodeFormer.
     "codeformer.pth": "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth",
-    # DeOldify artistic generator (large; only if colorizing).
-    # "ColorizeArtistic_gen.pth": "https://huggingface.co/databuzzword/deoldify-artistic/resolve/main/ColorizeArtistic_gen.pth",
+    # DDColor colorization (modelscope "large" model, ~912MB).
+    "ddcolor_modelscope.pth": "https://huggingface.co/piddnad/DDColor-models/resolve/main/ddcolor_modelscope.pth",
 }
 
 

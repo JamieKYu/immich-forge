@@ -121,9 +121,20 @@ class JobManager:
         if not name.lower().endswith((".jpg", ".jpeg", ".png")):
             name += ".jpg"
 
-        new_id, _dup = await self.immich.upload_asset(
+        new_id, is_duplicate = await self.immich.upload_asset(
             job.result_bytes, name, file_created_at=job.file_created_at
         )
+        # If Immich saw the forged bytes as a checksum duplicate it returns an
+        # EXISTING asset id (often the original), not a new one. Stacking that
+        # puts the same image on both sides of the stack — which only happens
+        # when the pipeline made no real change. Surface it instead of creating
+        # a bogus stack.
+        if is_duplicate or new_id == job.asset_id:
+            raise ValueError(
+                "forged image is identical to an existing asset — the enhancement "
+                "was a no-op (a model likely fell back). Check the server logs for "
+                "'falling back' / 'skipping'. Nothing was stacked."
+            )
         # Forged asset becomes primary; original stays as a child of the stack.
         stack_id = await self.immich.create_stack(new_id, [new_id, job.asset_id])
         job.new_asset_id = new_id

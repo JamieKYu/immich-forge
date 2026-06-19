@@ -1,7 +1,9 @@
-"""Colorization stage. Prefers DeOldify; falls back to passthrough.
+"""Colorization stage.
 
-DeOldify pins older fastai/torch and is best isolated. The scaffold leaves it as
-an explicit integration point and no-ops when unavailable.
+Wired backend: **DDColor** (ICCV 2023), vendored under `ddcolor/` — a
+self-contained torch implementation (no basicsr/timm dependency, so it doesn't
+collide with the basicsr used by Real-ESRGAN). When the model/weights are
+unavailable this stage is a logged no-op (it only ensures a 3-channel output).
 """
 from __future__ import annotations
 
@@ -19,28 +21,48 @@ class Colorizer:
         self.backend = backend
         self.weights_dir = weights_dir
         self.device = device
-        self._model = None
+        self._pipe = None                       # cached on successful load
+        self._disabled = backend == "none"      # permanent: backend off / libs absent
+        self._warned_missing = False            # warn once, not every call
 
     def _load(self):
-        if self.backend == "none":
-            return None
-        try:
-            # from deoldify.visualize import get_image_colorizer
-            # return get_image_colorizer(artistic=True)
-            raise ImportError("deoldify integration not wired in scaffold")
-        except ImportError:
-            log.warning("colorize backend %r unavailable; skipping colorize", self.backend)
+        """Build the DDColor pipeline. Returns None if it can't (yet)."""
+        weights = self.weights_dir / "ddcolor_modelscope.pth"
+        if not weights.exists():
+            # Transient — don't disable; retry if the weight is added later (no
+            # restart needed). Warn only once to avoid log spam.
+            if not self._warned_missing:
+                log.warning("missing %s; colorize no-ops until it's present", weights)
+                self._warned_missing = True
             return None
 
+        try:
+            import torch
+
+            from .ddcolor import ColorizationPipeline, DDColor, build_ddcolor_model
+        except ImportError as exc:
+            log.warning("ddcolor unavailable (%r); colorize disabled", exc)
+            self._disabled = True  # permanent for this process
+            return None
+
+        use_cuda = self.device == "cuda" and torch.cuda.is_available()
+        device = torch.device("cuda" if use_cuda else "cpu")
+        # The modelscope checkpoint is the "large" (convnext-l) model at 512px,
+        # matching build_ddcolor_model's defaults (MultiScaleColorDecoder).
+        model = build_ddcolor_model(
+            DDColor, model_path=str(weights), model_size="large",
+            input_size=512, device=device,
+        )
+        log.info("DDColor loaded on %s", device)
+        return ColorizationPipeline(model, input_size=512, device=device)
+
     def __call__(self, img: np.ndarray) -> np.ndarray:
-        if self._model is None:
-            self._model = self._load() or "skip"
-        if self._model == "skip":
-            # Only meaningful on a grayscale source; ensure 3-channel output.
+        if self._pipe is None and not self._disabled:
+            self._pipe = self._load()
+        if self._pipe is None:
+            # No-op fallback; only ensure a 3-channel output.
             if img.ndim == 2:
                 return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
             return img
-        # DeOldify works on PIL/RGB; orchestrator hands us BGR ndarray.
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        out_rgb = self._model.get_transformed_image_from_ndarray(rgb)
-        return cv2.cvtColor(np.asarray(out_rgb), cv2.COLOR_RGB2BGR)
+        # DDColor's pipeline takes and returns BGR uint8 — our convention.
+        return self._pipe.process(img)

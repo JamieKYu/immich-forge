@@ -1,11 +1,16 @@
 """Runs the selected enhancement stages in a sensible fixed order.
 
-Order: colorize -> upscale -> face_restore. Colorizing first gives the upscaler
-real color detail to sharpen; restoring faces last operates on the final-res
-image so detail isn't lost to a later resize.
+Order: colorize -> face_restore -> upscale.
+  - colorize first gives the later stages real color to work with (DDColor runs
+    at a fixed 512px internally, so its VRAM is independent of source size);
+  - face_restore second runs face *detection* on the original-resolution image.
+    Doing it after a 4x upscale meant detecting faces on a ~300MP image, which
+    OOMs the GPU. GFPGAN restores faces in-place; the final upscale sharpens them.
+  - upscale last, and it's tiled, so VRAM stays bounded even for large outputs.
 
 All stages exchange BGR uint8 ndarrays (OpenCV convention). A single GPU
-semaphore is held for the whole pipeline so concurrent jobs don't OOM the card.
+semaphore is held for the whole pipeline so concurrent jobs don't OOM the card,
+and the CUDA cache is released between stages to limit fragmentation.
 """
 from __future__ import annotations
 
@@ -32,7 +37,8 @@ class Pipeline:
         self.settings = settings
         tile = settings.tile_size if settings.tile_size > 0 else 0
         self.upscaler = Upscaler(
-            settings.upscale_backend, settings.weights_dir, settings.device, tile
+            settings.upscale_backend, settings.weights_dir, settings.device, tile,
+            settings.max_output_pixels,
         )
         self.face = FaceRestorer(
             settings.face_backend, settings.weights_dir, settings.device
@@ -77,8 +83,8 @@ class Pipeline:
 
         stages = [s for s, on in (
             ("colorize", ops.colorize),
-            ("upscale", ops.upscale),
             ("face_restore", ops.face_restore),
+            ("upscale", ops.upscale),
         ) if on]
         if not stages:
             raise ValueError("no operations selected")
@@ -88,11 +94,23 @@ class Pipeline:
             progress(i / len(stages), stage)
             if stage == "colorize":
                 img = self.colorizer(img)
-            elif stage == "upscale":
-                img = self.upscaler(img, ops.upscale_factor)
             elif stage == "face_restore":
                 img = self.face(img, ops.face_fidelity)
+            elif stage == "upscale":
+                img = self.upscaler(img, ops.upscale_factor)
             log.info("stage %s done -> %s", stage, img.shape)
+            self._free_gpu_cache()
 
         progress(1.0, "encoding")
         return self.encode(img)
+
+    @staticmethod
+    def _free_gpu_cache() -> None:
+        """Release cached CUDA memory between stages to limit fragmentation."""
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass

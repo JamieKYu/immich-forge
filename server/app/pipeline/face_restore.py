@@ -22,16 +22,18 @@ class FaceRestorer:
         self.backend = backend
         self.weights_dir = weights_dir
         self.device = device
-        self._model = None  # GFPGANer | "skip"
+        self._model = None                       # cached on successful load
+        self._disabled = backend == "none"       # permanent: backend off / libs absent
+        self._warned_missing = False             # warn once, not every call
 
     def _load(self):
-        """Load GFPGAN. Returns the GFPGANer, or None if unavailable."""
-        if self.backend == "none":
-            return None
-
+        """Load GFPGAN. Returns the GFPGANer, or None if it can't (yet)."""
         weights = self.weights_dir / "GFPGANv1.4.pth"
         if not weights.exists():
-            log.warning("missing %s; skipping face restore", weights)
+            # Transient — retry if the weight is added later (no restart needed).
+            if not self._warned_missing:
+                log.warning("missing %s; face restore no-ops until present", weights)
+                self._warned_missing = True
             return None
 
         try:
@@ -39,7 +41,8 @@ class FaceRestorer:
             import torch
             from gfpgan import GFPGANer
         except ImportError as exc:
-            log.warning("gfpgan unavailable (%s); skipping face restore", exc)
+            log.warning("gfpgan unavailable (%s); face restore disabled", exc)
+            self._disabled = True  # permanent for this process
             return None
 
         use_cuda = self.device == "cuda" and torch.cuda.is_available()
@@ -60,9 +63,9 @@ class FaceRestorer:
         )
 
     def __call__(self, img: np.ndarray, fidelity: float) -> np.ndarray:
+        if self._model is None and not self._disabled:
+            self._model = self._load()
         if self._model is None:
-            self._model = self._load() or "skip"
-        if self._model == "skip":
             return img
 
         # GFPGANer works on BGR uint8 (our pipeline convention) and returns

@@ -1,0 +1,12 @@
+# Keep the build context small and free of host-only / secret files.
+.venv/
+venv/
+weights/
+.env
+*.local
+__pycache__/
+*.py[cod]
+*.log
+README.md
+.dockerignore
+Dockerfile
