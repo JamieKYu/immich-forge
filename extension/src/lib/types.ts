@@ -36,6 +36,8 @@ export interface ImmichAsset {
 export interface Settings {
   forgeUrl: string // e.g. http://gpu-host:8000
   forgeToken: string
+  // Sticky default enhancements, edited on the settings page.
+  operations: ForgeOperations
 }
 
 export const DEFAULT_OPERATIONS: ForgeOperations = {

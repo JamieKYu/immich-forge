@@ -61,10 +61,44 @@ label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 12px
 .bar { height: 6px; background: var(--panel); border-radius: 4px; overflow: hidden; }
 .bar > div { height: 100%; background: var(--accent); transition: width .3s; }
 
-.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.compare figure { margin: 0; }
-.compare figcaption { color: var(--muted); font-size: 11px; text-align: center; }
-.compare img { width: 100%; border-radius: 6px; }
+/* Before on top, after below. */
+.compare { display: flex; flex-direction: column; gap: 10px; }
+.compare figure { margin: 0; position: relative; }
+.compare img { width: 100%; border-radius: 8px; display: block; }
+/* Label as a chip overlaid in the image's upper-left corner. */
+.compare figcaption {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+.compare .processing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 160px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.compare .processing .pct {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.compare .processing .bar {
+  width: 100%;
+  background: var(--bg); /* darker track so it contrasts with the panel box */
+}
 
 .error { color: #ff6b6b; font-size: 12px; margin-top: 8px; }
 .muted { color: var(--muted); }

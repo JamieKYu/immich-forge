@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { ForgeClient } from '../lib/forge-client'
 import { loadSettings, saveSettings } from '../lib/storage'
 import {
-  DEFAULT_OPERATIONS,
   type ForgeOperations,
   type ImmichAsset,
   type JobInfo,
@@ -71,7 +70,12 @@ export function App() {
           <NoPhoto />
         ) : (
           // key by assetId so navigating to another photo resets the flow.
-          <PhotoForge key={assetId} client={client} assetId={assetId} />
+          <PhotoForge
+            key={assetId}
+            client={client}
+            assetId={assetId}
+            operations={settings!.operations}
+          />
         )}
       </main>
     </div>
@@ -91,10 +95,17 @@ function NoPhoto() {
 }
 
 // Configure → review flow for one asset. Remounts (resets) when assetId changes.
-function PhotoForge({ client, assetId }: { client: ForgeClient; assetId: string }) {
+function PhotoForge({
+  client,
+  assetId,
+  operations,
+}: {
+  client: ForgeClient
+  assetId: string
+  operations: ForgeOperations
+}) {
   const [asset, setAsset] = useState<ImmichAsset | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [operations, setOperations] = useState<ForgeOperations>(DEFAULT_OPERATIONS)
   const [job, setJob] = useState<JobInfo | null>(null)
 
   useEffect(() => {
@@ -146,7 +157,6 @@ function PhotoForge({ client, assetId }: { client: ForgeClient; assetId: string 
       client={client}
       asset={subject}
       operations={operations}
-      setOperations={setOperations}
       onSubmitted={setJob}
     />
   )
