@@ -21,16 +21,19 @@ class Colorizer:
         self.backend = backend
         self.weights_dir = weights_dir
         self.device = device
-        self._pipe = None  # ColorizationPipeline | "skip"
+        self._pipe = None                       # cached on successful load
+        self._disabled = backend == "none"      # permanent: backend off / libs absent
+        self._warned_missing = False            # warn once, not every call
 
     def _load(self):
-        """Build the DDColor pipeline, or None if unavailable."""
-        if self.backend == "none":
-            return None
-
+        """Build the DDColor pipeline. Returns None if it can't (yet)."""
         weights = self.weights_dir / "ddcolor_modelscope.pth"
         if not weights.exists():
-            log.warning("missing %s; skipping colorize", weights)
+            # Transient — don't disable; retry if the weight is added later (no
+            # restart needed). Warn only once to avoid log spam.
+            if not self._warned_missing:
+                log.warning("missing %s; colorize no-ops until it's present", weights)
+                self._warned_missing = True
             return None
 
         try:
@@ -38,7 +41,8 @@ class Colorizer:
 
             from .ddcolor import ColorizationPipeline, DDColor, build_ddcolor_model
         except ImportError as exc:
-            log.warning("ddcolor unavailable (%r); skipping colorize", exc)
+            log.warning("ddcolor unavailable (%r); colorize disabled", exc)
+            self._disabled = True  # permanent for this process
             return None
 
         use_cuda = self.device == "cuda" and torch.cuda.is_available()
@@ -53,10 +57,10 @@ class Colorizer:
         return ColorizationPipeline(model, input_size=512, device=device)
 
     def __call__(self, img: np.ndarray) -> np.ndarray:
+        if self._pipe is None and not self._disabled:
+            self._pipe = self._load()
         if self._pipe is None:
-            self._pipe = self._load() or "skip"
-        if self._pipe == "skip":
-            # Only meaningful on a grayscale source; ensure 3-channel output.
+            # No-op fallback; only ensure a 3-channel output.
             if img.ndim == 2:
                 return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
             return img

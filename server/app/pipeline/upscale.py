@@ -20,10 +20,20 @@ class Upscaler:
         self.weights_dir = weights_dir
         self.device = device
         self.tile = tile
-        self._model = None  # RealESRGANer, loaded on first use
+        self._model = None                       # cached on successful load
+        self._disabled = backend != "realesrgan"  # permanent: backend off / libs absent
+        self._warned_missing = False             # warn once, not every call
 
     def _load_realesrgan(self):
-        """Load Real-ESRGAN. Returns None if the lib/weights are unavailable."""
+        """Load Real-ESRGAN. Returns None if the lib/weights aren't (yet) available."""
+        weights = self.weights_dir / "RealESRGAN_x4plus.pth"
+        if not weights.exists():
+            # Transient — retry if the weight is added later (no restart needed).
+            if not self._warned_missing:
+                log.warning("missing %s; upscaling with lanczos until present", weights)
+                self._warned_missing = True
+            return None
+
         try:
             patch_basicsr_torchvision()  # must precede the basicsr/realesrgan import
             import torch
@@ -33,12 +43,8 @@ class Upscaler:
             # Log the real exception — "not installed" vs the torchvision
             # functional_tensor removal vs a numpy-2 incompatibility look very
             # different and need different fixes.
-            log.warning("Real-ESRGAN unavailable, falling back to lanczos: %r", exc)
-            return None
-
-        weights = self.weights_dir / "RealESRGAN_x4plus.pth"
-        if not weights.exists():
-            log.warning("missing %s; falling back to lanczos", weights)
+            log.warning("Real-ESRGAN unavailable, using lanczos: %r", exc)
+            self._disabled = True  # permanent for this process
             return None
 
         model = RRDBNet(
@@ -57,12 +63,11 @@ class Upscaler:
         )
 
     def __call__(self, img: np.ndarray, factor: int) -> np.ndarray:
-        if self.backend == "realesrgan":
-            if self._model is None:
-                self._model = self._load_realesrgan() or "lanczos"
-            if self._model != "lanczos":
-                out, _ = self._model.enhance(img, outscale=factor)
-                return out
+        if self._model is None and not self._disabled:
+            self._model = self._load_realesrgan()
+        if self._model is not None:
+            out, _ = self._model.enhance(img, outscale=factor)
+            return out
         # Fallback: classical Lanczos resize.
         h, w = img.shape[:2]
         return cv2.resize(
