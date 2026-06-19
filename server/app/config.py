@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # when the deep model / weights are unavailable.
     upscale_backend: str = Field("realesrgan", alias="FORGE_UPSCALE_BACKEND")  # realesrgan|lanczos
     face_backend: str = Field("gfpgan", alias="FORGE_FACE_BACKEND")            # gfpgan|codeformer|none
-    colorize_backend: str = Field("deoldify", alias="FORGE_COLORIZE_BACKEND")  # deoldify|none
+    colorize_backend: str = Field("ddcolor", alias="FORGE_COLORIZE_BACKEND")   # ddcolor|none
 
     # --- Jobs ---
     job_ttl_seconds: int = Field(3600, alias="FORGE_JOB_TTL_SECONDS")

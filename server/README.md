@@ -71,11 +71,19 @@ curl -s -X POST $API/forge/$JOB/accept -H "Authorization: Bearer $TOKEN" | jq
 GPU semaphore serializes jobs so concurrent requests don't OOM the card. Large
 images are tiled (`FORGE_TILE_SIZE`).
 
-## Swapping in real models
+## Models
 
-1. `python scripts/download_weights.py` (or drop `.pth` files into `weights/`).
-2. Set `FORGE_*_BACKEND` env vars.
-3. For face restore / colorize, finish the integration points marked in
-   `app/pipeline/face_restore.py` and `app/pipeline/colorize.py` (kept optional
-   because their deps are heavy and version-sensitive — DeOldify especially is
-   best isolated in its own container).
+| Stage | Backend | Source |
+|-------|---------|--------|
+| upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `realesrgan` + `RealESRGAN_x4plus.pth` |
+| face restore | GFPGAN (`gfpgan` \| `codeformer` \| `none`) | pip `gfpgan` + `GFPGANv1.4.pth` |
+| colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
+
+DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
+`basicsr`/`timm` dependency, so it doesn't collide with the `basicsr` Real-ESRGAN
+uses. DeOldify was the original plan but needs fastai 1.x / torch 1.x, which is
+incompatible with the torch 2.x this image runs on.
+
+Each backend falls back to a classical/no-op impl when its weights are missing.
+To enable the deep models: `python scripts/download_weights.py` (or the
+container does it on first boot), then set the `FORGE_*_BACKEND` env vars.
