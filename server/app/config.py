@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     device: str = Field("cuda", alias="FORGE_DEVICE")  # "cuda" | "cpu"
     weights_dir: Path = Field(Path("weights"), alias="FORGE_WEIGHTS_DIR")
     max_image_pixels: int = Field(40_000_000, alias="FORGE_MAX_IMAGE_PIXELS")
+    # Cap on the upscaled output; the upscale factor is clamped down to fit. Stops
+    # a large source + x4 from producing a ~300MP image that OOMs the GPU.
+    max_output_pixels: int = Field(100_000_000, alias="FORGE_MAX_OUTPUT_PIXELS")
     tile_size: int = Field(512, alias="FORGE_TILE_SIZE")  # 0 disables tiling
 
     # Backend selection per stage. Each falls back to a classical-CV impl

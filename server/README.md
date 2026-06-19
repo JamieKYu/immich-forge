@@ -67,9 +67,14 @@ curl -s -X POST $API/forge/$JOB/accept -H "Authorization: Bearer $TOKEN" | jq
 
 ## Pipeline order
 
-`colorize → upscale → face_restore`, all exchanging BGR uint8 ndarrays. A single
-GPU semaphore serializes jobs so concurrent requests don't OOM the card. Large
-images are tiled (`FORGE_TILE_SIZE`).
+`colorize → face_restore → upscale`, all exchanging BGR uint8 ndarrays. Face
+restore runs *before* upscale so face detection works on the original-resolution
+image — detecting faces on a 4×-upscaled (~300MP) image OOMs the GPU. Upscale is
+last and tiled (`FORGE_TILE_SIZE`).
+
+A single GPU semaphore serializes jobs, the CUDA cache is freed between stages,
+and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS`
+(default 100MP) — e.g. a 19MP source requested at ×4 is clamped to ×2.
 
 ## Models
 
