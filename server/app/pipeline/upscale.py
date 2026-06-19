@@ -7,6 +7,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .compat import patch_basicsr_torchvision
+
 log = logging.getLogger("forge.upscale")
 
 
@@ -23,11 +25,15 @@ class Upscaler:
     def _load_realesrgan(self):
         """Load Real-ESRGAN. Returns None if the lib/weights are unavailable."""
         try:
+            patch_basicsr_torchvision()  # must precede the basicsr/realesrgan import
             import torch
             from basicsr.archs.rrdbnet_arch import RRDBNet
             from realesrgan import RealESRGANer
-        except ImportError:
-            log.warning("realesrgan/basicsr not installed; falling back to lanczos")
+        except ImportError as exc:
+            # Log the real exception — "not installed" vs the torchvision
+            # functional_tensor removal vs a numpy-2 incompatibility look very
+            # different and need different fixes.
+            log.warning("Real-ESRGAN unavailable, falling back to lanczos: %r", exc)
             return None
 
         weights = self.weights_dir / "RealESRGAN_x4plus.pth"

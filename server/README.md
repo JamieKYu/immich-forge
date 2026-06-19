@@ -10,9 +10,14 @@ Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud
 
 ```bash
 cp .env.example .env        # set IMMICH_BASE_URL, IMMICH_API_KEY, FORGE_API_TOKEN
-python scripts/download_weights.py   # optional; enables the deep backends
 docker compose up --build
 ```
+
+On first boot the container downloads the model weights into the mounted
+`weights/` volume (idempotent — subsequent starts are instant). Set
+`FORGE_SKIP_WEIGHT_DOWNLOAD=1` to bypass this and pre-populate `weights/`
+yourself (e.g. air-gapped hosts). The `basicsr` `functional_tensor` import is
+patched at build time so Real-ESRGAN / GFPGAN import cleanly.
 
 ## Run locally without a GPU (fallback mode)
 
