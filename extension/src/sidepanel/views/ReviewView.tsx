@@ -83,32 +83,9 @@ export function ReviewView({
 
   return (
     <div>
-      <p className="muted">{ops}</p>
       {error && <p className="error">{error}</p>}
 
-      {job.status !== 'done' && !error && (
-        <div>
-          <p className="muted">
-            {job.stage ?? job.status}… {Math.round(job.progress * 100)}%
-          </p>
-          <div className="bar">
-            <div style={{ width: `${Math.max(5, job.progress * 100)}%` }} />
-          </div>
-        </div>
-      )}
-
-      <div className="compare" style={{ marginTop: 12 }}>
-        <figure>
-          <img src={before ?? ''} />
-          <figcaption>Before</figcaption>
-        </figure>
-        <figure>
-          {after ? <img src={after} /> : <div className="muted">processing…</div>}
-          <figcaption>After</figcaption>
-        </figure>
-      </div>
-
-      <div className="row" style={{ marginTop: 14 }}>
+      <div className="row">
         <button onClick={onReforge}>Re-forge</button>
         <button
           className="accept"
@@ -118,6 +95,31 @@ export function ReviewView({
         >
           {accepting ? 'Stacking…' : 'Accept & stack as primary'}
         </button>
+      </div>
+
+      <p className="muted" style={{ marginTop: 8 }}>{ops}</p>
+
+      {/* After on top, Before on the bottom. */}
+      <div className="compare" style={{ marginTop: 8 }}>
+        <figure>
+          {after ? (
+            <img src={after} />
+          ) : (
+            // While forging, the After slot shows live progress in place of the image.
+            <div className="processing">
+              <span className="muted">{job.stage ?? job.status}…</span>
+              <span className="pct">{Math.round(job.progress * 100)}%</span>
+              <div className="bar">
+                <div style={{ width: `${Math.max(5, job.progress * 100)}%` }} />
+              </div>
+            </div>
+          )}
+          <figcaption>After</figcaption>
+        </figure>
+        <figure>
+          <img src={before ?? ''} />
+          <figcaption>Before</figcaption>
+        </figure>
       </div>
     </div>
   )
