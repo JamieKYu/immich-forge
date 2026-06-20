@@ -102,3 +102,12 @@ label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 12px
 
 .error { color: #ff6b6b; font-size: 12px; margin-top: 8px; }
 .muted { color: var(--muted); }
+.note {
+  font-size: 12px;
+  color: #e6c07b;
+  background: rgba(230, 192, 123, 0.1);
+  border: 1px solid rgba(230, 192, 123, 0.25);
+  border-radius: 6px;
+  padding: 6px 9px;
+  margin: 6px 0 0;
+}

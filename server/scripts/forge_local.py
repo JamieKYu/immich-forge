@@ -49,7 +49,9 @@ async def main() -> int:
         print(f"  [{int(p * 100):3d}%] {stage}")
 
     print(f"forging {args.input} -> {args.output}  ({ops})")
-    out = await pipeline.run(data, ops, progress)
+    out, notes = await pipeline.run(data, ops, progress)
+    for note in notes:
+        print(f"  note: {note}")
     args.output.write_bytes(out)
     print(f"done: {len(out) / 1024:.0f} KB written to {args.output}")
     return 0

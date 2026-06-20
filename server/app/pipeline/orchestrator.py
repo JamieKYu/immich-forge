@@ -66,14 +66,16 @@ class Pipeline:
 
     async def run(
         self, data: bytes, ops: ForgeOperations, progress: ProgressCb
-    ) -> bytes:
+    ) -> tuple[bytes, list[str]]:
+        """Returns (encoded image, notes) — notes surface user-facing adjustments
+        such as the upscale factor being clamped to the output-size limit."""
         async with self._gpu:
             # Heavy CPU/GPU work off the event loop.
             return await asyncio.to_thread(self._run_sync, data, ops, progress)
 
     def _run_sync(
         self, data: bytes, ops: ForgeOperations, progress: ProgressCb
-    ) -> bytes:
+    ) -> tuple[bytes, list[str]]:
         img = self.decode(data)
         h, w = img.shape[:2]
         if h * w > self.settings.max_image_pixels:
@@ -89,6 +91,7 @@ class Pipeline:
         if not stages:
             raise ValueError("no operations selected")
 
+        notes: list[str] = []
         progress(0.0, "starting")
         for i, stage in enumerate(stages):
             progress(i / len(stages), stage)
@@ -97,12 +100,19 @@ class Pipeline:
             elif stage == "face_restore":
                 img = self.face(img, ops.face_fidelity)
             elif stage == "upscale":
+                eff = self.upscaler.effective_factor(img, ops.upscale_factor)
+                if eff < ops.upscale_factor:
+                    sh, sw = img.shape[:2]
+                    notes.append(
+                        f"Upscale capped to ×{eff} (source {sw}×{sh}; ×{ops.upscale_factor} "
+                        f"would exceed the {self.settings.max_output_pixels:,}px output limit)."
+                    )
                 img = self.upscaler(img, ops.upscale_factor)
             log.info("stage %s done -> %s", stage, img.shape)
             self._free_gpu_cache()
 
         progress(1.0, "encoding")
-        return self.encode(img)
+        return self.encode(img), notes
 
     @staticmethod
     def _free_gpu_cache() -> None:

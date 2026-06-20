@@ -41,6 +41,7 @@ class JobInfo(BaseModel):
     progress: float = 0.0          # 0..1
     stage: str | None = None       # human-readable current stage
     error: str | None = None
+    notes: list[str] = []          # user-facing adjustments (e.g. upscale clamped)
     # Populated once the forged asset is accepted into Immich.
     new_asset_id: str | None = None
     stack_id: str | None = None
