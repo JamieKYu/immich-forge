@@ -29,6 +29,7 @@ class Job:
     stage: str | None = None
     error: str | None = None
     result_bytes: bytes | None = None
+    notes: list[str] = field(default_factory=list)
     original_filename: str = "asset.jpg"
     file_created_at: str | None = None
     new_asset_id: str | None = None
@@ -43,6 +44,7 @@ class Job:
             progress=self.progress,
             stage=self.stage,
             error=self.error,
+            notes=self.notes,
             new_asset_id=self.new_asset_id,
             stack_id=self.stack_id,
         )
@@ -105,7 +107,7 @@ class JobManager:
             job.stage = stage
 
         original = await self.immich.download_original(job.asset_id)
-        job.result_bytes = await self.pipeline.run(
+        job.result_bytes, job.notes = await self.pipeline.run(
             original, job.operations, on_progress
         )
         job.status = JobStatus.done

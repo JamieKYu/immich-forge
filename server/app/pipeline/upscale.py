@@ -66,22 +66,26 @@ class Upscaler:
             device=self.device if half else "cpu",
         )
 
-    def _effective_factor(self, img: np.ndarray, factor: int) -> int:
-        """Clamp the upscale factor so the output stays under max_output_pixels."""
+    def effective_factor(self, img: np.ndarray, factor: int) -> int:
+        """The upscale factor clamped so the output stays under max_output_pixels.
+
+        Pure (no logging) so callers can use it both to decide and to report.
+        """
         if self.max_output_pixels <= 0:
             return factor
         h, w = img.shape[:2]
         allowed = int((self.max_output_pixels / (h * w)) ** 0.5)
-        allowed = max(1, min(factor, allowed))
-        if allowed < factor:
-            log.warning(
-                "clamping upscale x%d -> x%d: source %dx%d would exceed %d output px",
-                factor, allowed, w, h, self.max_output_pixels,
-            )
-        return allowed
+        return max(1, min(factor, allowed))
 
     def __call__(self, img: np.ndarray, factor: int) -> np.ndarray:
-        factor = self._effective_factor(img, factor)
+        requested = factor
+        factor = self.effective_factor(img, factor)
+        if factor < requested:
+            h, w = img.shape[:2]
+            log.warning(
+                "clamping upscale x%d -> x%d: source %dx%d would exceed %d output px",
+                requested, factor, w, h, self.max_output_pixels,
+            )
         if factor <= 1:
             return img  # source already at/over the output cap; leave as-is
         if self._model is None and not self._disabled:

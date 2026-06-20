@@ -99,6 +99,10 @@ export function ReviewView({
 
       <p className="muted" style={{ marginTop: 8 }}>{ops}</p>
 
+      {job.notes?.map((note, i) => (
+        <p key={i} className="note">{note}</p>
+      ))}
+
       {/* After on top, Before on the bottom. */}
       <div className="compare" style={{ marginTop: 8 }}>
         <figure>

@@ -17,6 +17,7 @@ export interface JobInfo {
   progress: number
   stage: string | null
   error: string | null
+  notes: string[]
   new_asset_id: string | null
   stack_id: string | null
 }
