@@ -15,21 +15,26 @@ chrome.runtime.onInstalled.addListener(() => {
     .catch((err) => console.error('sidePanel behavior', err))
 })
 
+// Per-state icon paths (relative to the extension root; copied from public/).
+const iconSet = (state: 'active' | 'inactive') => ({
+  16: `icons/forge-${state}-16.png`,
+  32: `icons/forge-${state}-32.png`,
+  48: `icons/forge-${state}-48.png`,
+})
+
 async function applyIcon(tabId: number, assetId: string | null) {
+  // The lit (colored) icon means "you can forge this photo"; the unlit (grey)
+  // icon means there's nothing to forge here. The action stays enabled in both
+  // states so a click always opens the panel (which guides you when unlit).
   try {
-    if (assetId) {
-      await chrome.action.enable(tabId)
-      await chrome.action.setBadgeText({ tabId, text: '●' })
-      await chrome.action.setBadgeBackgroundColor({ tabId, color: '#29b765' })
-      await chrome.action.setTitle({ tabId, title: 'Forge this photo' })
-    } else {
-      await chrome.action.disable(tabId)
-      await chrome.action.setBadgeText({ tabId, text: '' })
-      await chrome.action.setTitle({
-        tabId,
-        title: 'Open a photo in Immich to forge it',
-      })
-    }
+    await chrome.action.setIcon({
+      tabId,
+      path: iconSet(assetId ? 'active' : 'inactive'),
+    })
+    await chrome.action.setTitle({
+      tabId,
+      title: assetId ? 'Forge this photo' : 'Open a photo in Immich to forge it',
+    })
   } catch {
     // tab may have closed between event and update; ignore.
   }
