@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ForgeClient } from '../../lib/forge-client'
 import type { ForgeOperations, ImmichAsset, JobInfo } from '../../lib/types'
+import { useAssetImage } from '../useAssetImage'
 
 export function ConfigureView({
   client,
@@ -13,13 +14,9 @@ export function ConfigureView({
   operations: ForgeOperations
   onSubmitted: (j: JobInfo) => void
 }) {
-  const [thumb, setThumb] = useState<string | null>(null)
+  const { src: preview, onError: onPreviewError } = useAssetImage(client, asset.id)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    client.thumbnailDataUrl(asset.id).then(setThumb).catch(() => {})
-  }, [asset.id])
 
   const summary = [
     operations.colorize && 'colorize',
@@ -70,8 +67,12 @@ export function ConfigureView({
         <span className="muted">{asset.originalFileName}</span>
         {summary && <span className="muted">{summary}</span>}
       </div>
-      {thumb && (
-        <img src={thumb} style={{ width: '100%', borderRadius: 8, marginTop: 8 }} />
+      {preview && (
+        <img
+          src={preview}
+          onError={onPreviewError}
+          style={{ width: '100%', borderRadius: 8, marginTop: 8 }}
+        />
       )}
     </div>
   )

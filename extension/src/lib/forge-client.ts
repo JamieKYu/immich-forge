@@ -61,6 +61,17 @@ export class ForgeClient {
     return blobToDataUrl(await r.blob())
   }
 
+  // Full-resolution original for a 1:1-quality preview. May be a non-web format
+  // (HEIC/RAW) the browser can't render — callers should fall back to the
+  // thumbnail on an <img> error.
+  async originalDataUrl(assetId: string): Promise<string> {
+    const r = await fetch(`${this.base}/immich/original/${assetId}`, {
+      headers: this.headers(),
+    })
+    if (!r.ok) throw new Error(`original ${r.status}`)
+    return blobToDataUrl(await r.blob())
+  }
+
   async forge(assetId: string, operations: ForgeOperations): Promise<JobInfo> {
     const r = await fetch(`${this.base}/forge`, {
       method: 'POST',
