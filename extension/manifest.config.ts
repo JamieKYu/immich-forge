@@ -5,7 +5,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 // the optional_host_permissions flow (chrome.permissions.request).
 export default defineManifest({
   manifest_version: 3,
-  name: 'Immich Forge',
+  name: 'Forge for Immich',
   version: '0.1.0',
   description: 'Forge low-quality Immich photos: upscale, face-restore, colorize.',
   // tabs/webNavigation: detect the asset id in the active tab's URL (incl. SPA
@@ -27,7 +27,7 @@ export default defineManifest({
     128: 'icons/forge-active-128.png',
   },
   action: {
-    default_title: 'Open Immich Forge',
+    default_title: 'Open Forge for Immich',
     // Resting toolbar state is the unlit (grey) icon; the service worker swaps
     // to the active icon on photo pages.
     default_icon: {
