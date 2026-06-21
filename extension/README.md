@@ -65,6 +65,9 @@ src/sidepanel/             React UI
 - Job polling currently lives in the side panel. To survive the panel closing,
   move polling into the service worker and persist job ids in
   `chrome.storage.session` (noted in `service-worker.ts`).
-- Toolbar icons are a "spark" mark in two states (active/colored, inactive/grey).
-  Regenerate them with `server/.venv/bin/python icons/generate_icons.py` (needs
-  Pillow); they're copied verbatim from `public/icons/` into `dist/icons/`.
+- Toolbar icons are the "F" logo in two states (active/gradient, inactive/grey),
+  extracted from the design sheet `icons/forge-icons.png` (a flattened preview on
+  a transparency checkerboard). Regenerate with
+  `server/.venv/bin/python icons/generate_icons.py` (needs Pillow + numpy +
+  OpenCV); output lands in `public/icons/` and is copied verbatim into
+  `dist/icons/`.
