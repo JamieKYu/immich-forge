@@ -45,7 +45,6 @@ service-worker/manifest changes).
 
 ```
 manifest.config.ts          MV3 manifest (via @crxjs/vite-plugin)
-icons/generate_icons.py     regenerates the toolbar icons into public/icons/
 public/icons/              lit (active) + unlit (inactive) PNGs, 16/32/48/128
 src/background/             service worker: per-tab icon swap + active asset id
 src/lib/                    types, settings storage, ForgeClient, immich-url parser
@@ -66,8 +65,7 @@ src/sidepanel/             React UI
   move polling into the service worker and persist job ids in
   `chrome.storage.session` (noted in `service-worker.ts`).
 - Toolbar icons are the "F" logo in two states (active/gradient, inactive/grey),
-  extracted from the design sheet `icons/forge-icons.png` (a flattened preview on
-  a transparency checkerboard). Regenerate with
-  `server/.venv/bin/python icons/generate_icons.py` (needs Pillow + numpy +
-  OpenCV); output lands in `public/icons/` and is copied verbatim into
-  `dist/icons/`.
+  committed under `public/icons/`. The design sheet and the generator that
+  produces them live outside this repo at `~/git/tools/immich-forge-icons/`
+  (see its README); they're copied verbatim from `public/icons/` into
+  `dist/icons/` at build.
