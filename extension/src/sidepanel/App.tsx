@@ -46,7 +46,7 @@ export function App() {
   return (
     <div className="app">
       <header>
-        <h1>Immich Forge</h1>
+        <h1>Forge for Immich</h1>
         <span className="status">
           {health === null
             ? '…'

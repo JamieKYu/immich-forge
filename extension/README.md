@@ -13,8 +13,9 @@ API key — no Immich credentials are stored in the browser.
 - The service worker watches the active tab's URL for an Immich asset id
   (`/photos/<uuid>`, also album/share `/photo/<uuid>`). It keys off the **asset
   UUID, not the host**, so it works regardless of how you reach Immich.
-- On a photo page the action is **enabled with a green badge**; otherwise it's
-  greyed and inert (clicking does nothing).
+- On a photo page the toolbar shows the **lit (colored) icon**; otherwise the
+  **unlit (grey) icon**. Clicking always opens the panel — which guides you to a
+  photo when unlit.
 - Immich is a client-routed SPA, so `webNavigation.onHistoryStateUpdated` is used
   to catch navigation _between_ photos, not just full page loads. The active
   asset id is mirrored into `storage.session`, so an open panel updates live as
@@ -31,11 +32,11 @@ Then load it in Chrome:
 
 1. Go to `chrome://extensions`, enable **Developer mode**.
 2. **Load unpacked** → select `extension/dist`.
-3. Open the side panel (the icon is greyed until you're on a photo) and, in
+3. Open the side panel (the icon is grey until you're on a photo) and, in
    **settings**, enter your Forge server URL (e.g. `http://gpu-host:8000`) and
    token, then **Test** → **Save**.
-4. Open a photo in Immich (`…/photos/<id>`) — the icon lights up with a green
-   badge. Click it to forge that photo.
+4. Open a photo in Immich (`…/photos/<id>`) — the icon lights up (colored).
+   Click it to forge that photo.
 
 `npm run dev` rebuilds on change (reload the unpacked extension to pick up
 service-worker/manifest changes).
@@ -44,13 +45,14 @@ service-worker/manifest changes).
 
 ```
 manifest.config.ts          MV3 manifest (via @crxjs/vite-plugin)
-src/background/             service worker: per-tab icon state + active asset id
+public/icons/              lit (active) + unlit (inactive) PNGs, 16/32/48/128
+src/background/             service worker: per-tab icon swap + active asset id
 src/lib/                    types, settings storage, ForgeClient, immich-url parser
 src/sidepanel/             React UI
   App.tsx                  settings vs. current-photo flow
   useActiveAsset.ts        active tab's asset id (live, SPA-aware)
-  views/SettingsView       Forge URL + token, connection test
-  views/ConfigureView      preview + operation toggles (upscale/face/colorize)
+  views/SettingsView       Forge URL + token + sticky default enhancements
+  views/ConfigureView      Forge button + preview
   views/ReviewView         progress, before/after, accept & stack
 ```
 
@@ -62,6 +64,8 @@ src/sidepanel/             React UI
 - Job polling currently lives in the side panel. To survive the panel closing,
   move polling into the service worker and persist job ids in
   `chrome.storage.session` (noted in `service-worker.ts`).
-- The toolbar uses the default icon + a green badge to signal "ready". Drop in
-  custom active/inactive PNGs and `chrome.action.setIcon` later if you want a
-  distinct lit-up icon.
+- Toolbar icons are the "F" logo in two states (active/gradient, inactive/grey),
+  committed under `public/icons/`. The design sheet and the generator that
+  produces them live outside this repo at `~/git/tools/immich-forge-icons/`
+  (see its README); they're copied verbatim from `public/icons/` into
+  `dist/icons/` at build.
