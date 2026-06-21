@@ -11,6 +11,7 @@ Endpoints:
   Immich-proxy reads for the extension's browser UI (broker keeps the key):
   GET  /immich/search           proxied asset search
   GET  /immich/thumbnail/{id}   proxied thumbnail bytes
+  GET  /immich/original/{id}    proxied full-resolution original bytes
 """
 from __future__ import annotations
 
@@ -183,6 +184,23 @@ async def immich_thumbnail(asset_id: str, request: Request, _: None = Depends(re
     if r.status_code != 200:
         raise HTTPException(status_code=502, detail="thumbnail fetch failed")
     return Response(content=r.content, media_type=r.headers.get("content-type", "image/jpeg"))
+
+
+@app.get("/immich/original/{asset_id}")
+async def immich_original(asset_id: str, request: Request, _: None = Depends(require_token)):
+    """Full-resolution original — used for a 1:1-quality preview in the panel.
+    Note: may be a non-web format (HEIC/RAW); the client falls back to the
+    thumbnail if the browser can't render it."""
+    immich: ImmichClient = request.app.state.immich
+    r = await immich._client.get(
+        f"/api/assets/{asset_id}/original", headers=immich._headers
+    )
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail="original fetch failed")
+    return Response(
+        content=r.content,
+        media_type=r.headers.get("content-type", "application/octet-stream"),
+    )
 
 
 def _gpu_status(device: str) -> dict:

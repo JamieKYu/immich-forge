@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ForgeClient } from '../../lib/forge-client'
 import type { ForgeOperations, ImmichAsset, JobInfo } from '../../lib/types'
+import { useAssetImage } from '../useAssetImage'
 
 export function ReviewView({
   client,
@@ -18,7 +19,7 @@ export function ReviewView({
   onDone: () => void
 }) {
   const [job, setJob] = useState<JobInfo>(initialJob)
-  const [before, setBefore] = useState<string | null>(null)
+  const { src: before, onError: onBeforeError } = useAssetImage(client, asset.id)
   const [after, setAfter] = useState<string | null>(null)
   const [accepting, setAccepting] = useState(false)
   const [accepted, setAccepted] = useState<string | null>(null)
@@ -27,8 +28,6 @@ export function ReviewView({
 
   // Poll job status until done/error.
   useEffect(() => {
-    client.thumbnailDataUrl(asset.id).then(setBefore).catch(() => {})
-
     async function poll() {
       try {
         const j = await client.job(initialJob.job_id)
@@ -121,7 +120,11 @@ export function ReviewView({
           <figcaption>After</figcaption>
         </figure>
         <figure>
-          <img src={before ?? ''} />
+          {before ? (
+            <img src={before} onError={onBeforeError} />
+          ) : (
+            <div className="processing">loading…</div>
+          )}
           <figcaption>Before</figcaption>
         </figure>
       </div>
