@@ -27,7 +27,7 @@ export default defineManifest({
     128: 'icons/forge-active-128.png',
   },
   action: {
-    default_title: 'Open Forge for Immich',
+    default_title: 'Forge for Immich',
     // Resting toolbar state is the unlit (grey) icon; the service worker swaps
     // to the active icon on photo pages.
     default_icon: {
