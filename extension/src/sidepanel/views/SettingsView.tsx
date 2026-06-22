@@ -48,7 +48,7 @@ export function SettingsView({
           checked={operations.colorize}
           onChange={(e) => set({ colorize: e.target.checked })}
         />
-        <span>Colorize (black &amp; white → color)</span>
+        <span>Colorize</span>
       </div>
 
       <div className="toggle">
@@ -82,7 +82,7 @@ export function SettingsView({
       {operations.face_restore && (
         <div>
           <label>
-            Fidelity ({operations.face_fidelity.toFixed(2)}) — higher = closer to
+            Fidelity ({operations.face_fidelity.toFixed(2)}) — higher is closer to
             original
           </label>
           <input
