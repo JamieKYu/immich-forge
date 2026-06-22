@@ -11,6 +11,36 @@ from .compat import patch_basicsr_torchvision
 
 log = logging.getLogger("forge.upscale")
 
+# Smallest tile we'll retry with before giving up on the GPU entirely.
+_MIN_TILE = 128
+
+
+def _looks_like_oom(exc: BaseException) -> bool:
+    """True if `exc` is (or masks) a CUDA out-of-memory.
+
+    Real-ESRGAN's tile loop catches the OOM RuntimeError, prints it, then crashes
+    with `UnboundLocalError: ... 'output_tile' ...` because the tile output never
+    got assigned. So an OOM reaches us either directly or wearing that disguise.
+    """
+    name = type(exc).__name__
+    msg = str(exc).lower()
+    return (
+        name == "OutOfMemoryError"
+        or "out of memory" in msg
+        or "output_tile" in msg
+    )
+
+
+def _free_cuda() -> None:
+    """Release cached CUDA memory so the next (smaller) attempt has room."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
+
 
 class Upscaler:
     """Lazy-loaded upscaler. `backend` selects the implementation."""
@@ -91,10 +121,40 @@ class Upscaler:
         if self._model is None and not self._disabled:
             self._model = self._load_realesrgan()
         if self._model is not None:
-            out, _ = self._model.enhance(img, outscale=factor)
-            return out
+            out = self._enhance(img, factor)
+            if out is not None:
+                return out
+            # GPU couldn't fit it at any tile size — degrade to Lanczos below.
         # Fallback: classical Lanczos resize.
         h, w = img.shape[:2]
         return cv2.resize(
             img, (w * factor, h * factor), interpolation=cv2.INTER_LANCZOS4
         )
+
+    def _enhance(self, img: np.ndarray, factor: int) -> np.ndarray | None:
+        """Run Real-ESRGAN, halving the tile size on each OOM. Returns None to
+        tell the caller to fall back to Lanczos (GPU too contended to fit a tile).
+        """
+        # Tile ladder: configured size down to _MIN_TILE. tile<=0 means tiling is
+        # off, so there's a single whole-image attempt with nothing to shrink.
+        tiles = [0]
+        if self.tile > 0:
+            tiles = []
+            t = self.tile
+            while t >= _MIN_TILE:
+                tiles.append(t)
+                t //= 2
+        for tile in tiles:
+            try:
+                self._model.tile_size = tile
+                out, _ = self._model.enhance(img, outscale=factor)
+                if tile != self.tile:
+                    log.warning("upscale recovered at tile=%d (configured %d)", tile, self.tile)
+                return out
+            except Exception as exc:  # noqa: BLE001 - re-raised below unless it's an OOM
+                if not _looks_like_oom(exc):
+                    raise
+                _free_cuda()
+                log.warning("upscale OOM at tile=%d (%s); retrying smaller", tile, type(exc).__name__)
+        log.warning("upscale out of GPU memory at every tile size; falling back to lanczos")
+        return None
