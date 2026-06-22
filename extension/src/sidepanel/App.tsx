@@ -18,6 +18,8 @@ export function App() {
   const [health, setHealth] = useState<{ forge: boolean; immich: boolean } | null>(
     null,
   )
+  // True once a forge job is submitted (the review screen is showing).
+  const [reviewing, setReviewing] = useState(false)
   const assetId = useActiveAsset()
   // Latest values being edited in the settings panel, reported up by SettingsView
   // so the header "close" link can save them.
@@ -57,17 +59,28 @@ export function App() {
     }
   }
 
+  const title =
+    showSettings || !client
+      ? 'Configure'
+      : reviewing
+        ? 'Review'
+        : 'Original'
+
   return (
     <div className="app">
       <header>
-        <h1>Forge for Immich</h1>
+        <h1>{title}</h1>
         <span className="status">
           {health === null
             ? '…'
             : !health.forge
               ? '○ forge offline'
               : health.immich
-                ? '● connected'
+                ? (
+                  <>
+                    <span style={{ color: 'var(--accent-2)' }}>●</span> connected
+                  </>
+                )
                 : '◐ immich unreachable'}
           {' · '}
           <a onClick={toggleSettings} style={{ cursor: 'pointer' }}>
@@ -94,6 +107,7 @@ export function App() {
             client={client}
             assetId={assetId}
             operations={settings!.operations}
+            onReviewingChange={setReviewing}
           />
         )}
       </main>
@@ -114,10 +128,12 @@ function PhotoForge({
   client,
   assetId,
   operations,
+  onReviewingChange,
 }: {
   client: ForgeClient
   assetId: string
   operations: ForgeOperations
+  onReviewingChange: (reviewing: boolean) => void
 }) {
   const [asset, setAsset] = useState<ImmichAsset | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -130,6 +146,13 @@ function PhotoForge({
       .then(setAsset)
       .catch((e: Error) => setError(e.message))
   }, [assetId])
+
+  // Drive the header title: review screen while a job exists, reset on unmount
+  // (settings opened, photo changed, or navigated away).
+  useEffect(() => {
+    onReviewingChange(!!job)
+  }, [job])
+  useEffect(() => () => onReviewingChange(false), [])
 
   // Fall back to a minimal asset shell if metadata hasn't loaded yet; the id is
   // all the server needs to forge.

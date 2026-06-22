@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ForgeClient } from '../../lib/forge-client'
 import type { ForgeOperations, JobInfo } from '../../lib/types'
+import { reloadActiveTab } from '../../lib/tabs'
 
 export function ReviewView({
   client,
@@ -51,6 +52,8 @@ export function ReviewView({
     try {
       const r = await client.accept(job.job_id)
       setAccepted(r.new_asset_id)
+      // Refresh the Immich page so the newly stacked primary shows up.
+      void reloadActiveTab()
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -67,8 +70,7 @@ export function ReviewView({
   if (accepted) {
     return (
       <div>
-        <p>✓ Forged asset stacked as the new primary.</p>
-        <p className="muted">New asset id: {accepted}</p>
+        <p>Forged image now stacked as the new primary.</p>
         <button className="primary" style={{ width: '100%' }} onClick={onDone}>
           Done
         </button>
