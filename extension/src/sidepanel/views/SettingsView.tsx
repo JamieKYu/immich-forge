@@ -1,36 +1,28 @@
-import { useState } from 'react'
-import { ForgeClient } from '../../lib/forge-client'
+import { useEffect, useRef, useState } from 'react'
 import { DEFAULT_OPERATIONS, type ForgeOperations, type Settings } from '../../lib/types'
 
 export function SettingsView({
   settings,
-  onSave,
-  client,
+  onChange,
 }: {
   settings: Settings | null
-  onSave: (s: Settings) => void
-  client: ForgeClient | null
+  onChange: (s: Settings) => void
 }) {
   const [forgeUrl, setForgeUrl] = useState(settings?.forgeUrl ?? '')
   const [forgeToken, setForgeToken] = useState(settings?.forgeToken ?? '')
   const [operations, setOperations] = useState<ForgeOperations>(
     settings?.operations ?? DEFAULT_OPERATIONS,
   )
-  const [test, setTest] = useState<string | null>(null)
 
   const set = (patch: Partial<ForgeOperations>) =>
     setOperations((o) => ({ ...o, ...patch }))
 
-  async function testConnection() {
-    setTest('testing…')
-    try {
-      const c = client ?? new ForgeClient({ forgeUrl, forgeToken, operations })
-      const h = await c.health()
-      setTest(h.ok ? `ok — immich:${h.immich ? '✓' : '✗'}` : 'unhealthy')
-    } catch (e) {
-      setTest(`failed: ${(e as Error).message}`)
-    }
-  }
+  // Report the current values up so the header "close" link can save them.
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  useEffect(() => {
+    onChangeRef.current({ forgeUrl, forgeToken, operations })
+  }, [forgeUrl, forgeToken, operations])
 
   return (
     <div>
@@ -48,15 +40,7 @@ export function SettingsView({
         value={forgeToken}
         onChange={(e) => setForgeToken(e.target.value)}
       />
-      <p className="muted" style={{ marginTop: 10 }}>
-        The Forge server holds your Immich API key — it is never stored in the
-        browser.
-      </p>
-
       <label style={{ marginTop: 16 }}>Default enhancements</label>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Applied to every photo you forge. Saved on this device.
-      </p>
 
       <div className="toggle">
         <input
@@ -112,18 +96,6 @@ export function SettingsView({
           />
         </div>
       )}
-
-      <div className="row" style={{ marginTop: 16 }}>
-        <button onClick={testConnection}>Test</button>
-        <button
-          className="primary"
-          disabled={!forgeUrl}
-          onClick={() => onSave({ forgeUrl, forgeToken, operations })}
-        >
-          Save
-        </button>
-        {test && <span className="muted">{test}</span>}
-      </div>
     </div>
   )
 }

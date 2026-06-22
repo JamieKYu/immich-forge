@@ -33,7 +33,7 @@ async function applyIcon(tabId: number, assetId: string | null) {
     })
     await chrome.action.setTitle({
       tabId,
-      title: assetId ? 'Forge this photo' : 'Open a photo in Immich to forge it',
+      title: assetId ? 'Forge this photo' : 'Forge for Immich',
     })
   } catch {
     // tab may have closed between event and update; ignore.

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ForgeClient } from '../lib/forge-client'
 import { loadSettings, saveSettings } from '../lib/storage'
 import {
@@ -19,6 +19,9 @@ export function App() {
     null,
   )
   const assetId = useActiveAsset()
+  // Latest values being edited in the settings panel, reported up by SettingsView
+  // so the header "close" link can save them.
+  const pending = useRef<Settings | null>(null)
 
   const client = settings && settings.forgeUrl ? new ForgeClient(settings) : null
 
@@ -43,6 +46,17 @@ export function App() {
     setShowSettings(false)
   }
 
+  // Header link: opening just shows the panel; closing saves the edited values.
+  function toggleSettings() {
+    if (!showSettings) {
+      setShowSettings(true)
+    } else if (pending.current) {
+      persist(pending.current)
+    } else {
+      setShowSettings(false)
+    }
+  }
+
   return (
     <div className="app">
       <header>
@@ -56,14 +70,19 @@ export function App() {
                 ? '● connected'
                 : '◐ immich unreachable'}
           {' · '}
-          <a onClick={() => setShowSettings((v) => !v)} style={{ cursor: 'pointer' }}>
+          <a onClick={toggleSettings} style={{ cursor: 'pointer' }}>
             {showSettings ? 'close' : 'settings'}
           </a>
         </span>
       </header>
       <main>
         {showSettings || !client ? (
-          <SettingsView settings={settings} onSave={persist} client={client} />
+          <SettingsView
+            settings={settings}
+            onChange={(s) => {
+              pending.current = s
+            }}
+          />
         ) : assetId === undefined ? (
           <p className="muted">Detecting current photo…</p>
         ) : assetId === null ? (
@@ -86,10 +105,6 @@ function NoPhoto() {
   return (
     <div>
       <p>Open a photo in Immich to forge it.</p>
-      <p className="muted">
-        Navigate to a single photo (its URL looks like
-        <code> /photos/&lt;id&gt;</code>) and the toolbar icon lights up.
-      </p>
     </div>
   )
 }
@@ -143,7 +158,6 @@ function PhotoForge({
     return (
       <ReviewView
         client={client}
-        asset={subject}
         initialJob={job}
         operations={operations}
         onReforge={() => setJob(null)}

@@ -1,25 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ForgeClient } from '../../lib/forge-client'
-import type { ForgeOperations, ImmichAsset, JobInfo } from '../../lib/types'
-import { useAssetImage } from '../useAssetImage'
+import type { ForgeOperations, JobInfo } from '../../lib/types'
 
 export function ReviewView({
   client,
-  asset,
   initialJob,
   operations,
   onReforge,
   onDone,
 }: {
   client: ForgeClient
-  asset: ImmichAsset
   initialJob: JobInfo
   operations: ForgeOperations
   onReforge: () => void
   onDone: () => void
 }) {
   const [job, setJob] = useState<JobInfo>(initialJob)
-  const { src: before, onError: onBeforeError } = useAssetImage(client, asset.id)
   const [after, setAfter] = useState<string | null>(null)
   const [accepting, setAccepting] = useState(false)
   const [accepted, setAccepted] = useState<string | null>(null)
@@ -85,15 +81,15 @@ export function ReviewView({
       {error && <p className="error">{error}</p>}
 
       <div className="row">
-        <button onClick={onReforge}>Re-forge</button>
         <button
           className="accept"
           style={{ flex: 1 }}
           disabled={job.status !== 'done' || accepting}
           onClick={accept}
         >
-          {accepting ? 'Stacking…' : 'Accept & stack as primary'}
+          {accepting ? 'Stacking…' : 'Save to Immich'}
         </button>
+        <button onClick={onReforge}>Reset</button>
       </div>
 
       <p className="muted" style={{ marginTop: 8 }}>{ops}</p>
@@ -102,13 +98,15 @@ export function ReviewView({
         <p key={i} className="note">{note}</p>
       ))}
 
-      {/* After on top, Before on the bottom. */}
       <div className="compare" style={{ marginTop: 8 }}>
         <figure>
           {after ? (
-            <img src={after} />
+            <>
+              <img src={after} />
+              <figcaption>Forged</figcaption>
+            </>
           ) : (
-            // While forging, the After slot shows live progress in place of the image.
+            // While forging, show live progress in place of the image.
             <div className="processing">
               <span className="muted">{job.stage ?? job.status}…</span>
               <span className="pct">{Math.round(job.progress * 100)}%</span>
@@ -117,15 +115,6 @@ export function ReviewView({
               </div>
             </div>
           )}
-          <figcaption>After</figcaption>
-        </figure>
-        <figure>
-          {before ? (
-            <img src={before} onError={onBeforeError} />
-          ) : (
-            <div className="processing">loading…</div>
-          )}
-          <figcaption>Before</figcaption>
         </figure>
       </div>
     </div>
