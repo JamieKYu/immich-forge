@@ -16,7 +16,15 @@ class Settings(BaseSettings):
     immich_api_key: str = Field("", alias="IMMICH_API_KEY")
 
     # --- Auth on the Forge API itself (so it's not an open GPU endpoint) ---
+    # Required: when empty, the API refuses to serve (fail closed) so the Immich
+    # library is never exposed through an unauthenticated proxy.
     forge_api_token: str = Field("", alias="FORGE_API_TOKEN")
+
+    # Comma-separated CORS allow-list for the Forge API. Empty (default) adds no
+    # permissive CORS headers — the extension reaches Forge via its granted host
+    # permission, which is not subject to CORS, so this stays locked down and
+    # arbitrary websites cannot read responses from the Forge server.
+    cors_origins: str = Field("", alias="FORGE_CORS_ORIGINS")
 
     # --- GPU / pipeline ---
     device: str = Field("cuda", alias="FORGE_DEVICE")  # "cuda" | "cpu"
@@ -40,6 +48,10 @@ class Settings(BaseSettings):
     @property
     def immich_headers(self) -> dict[str, str]:
         return {"x-api-key": self.immich_api_key, "Accept": "application/json"}
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 @lru_cache

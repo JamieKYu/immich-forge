@@ -1,9 +1,12 @@
-# Immich Forge — Chrome Extension
+# Forge for Immich — Chrome Extension
 
 Manifest V3 side-panel extension. It detects when you're **viewing a single
 photo** in the Immich web app and lights up the toolbar icon. Click it to open
 the side panel for that photo: preview, enhancement options, **Forge**, review
-before/after, and accept to stack the forged image as the new primary asset.
+the result, and accept to stack the forged image as the new primary asset.
+
+> Unofficial, independent project — not affiliated with or endorsed by Immich or
+> FUTO.
 
 It talks **only** to the Forge server (server-as-broker), which holds the Immich
 API key — no Immich credentials are stored in the browser.
@@ -34,7 +37,8 @@ Then load it in Chrome:
 2. **Load unpacked** → select `extension/dist`.
 3. Open the side panel (the icon is grey until you're on a photo) and, in
    **settings**, enter your Forge server URL (e.g. `http://gpu-host:8000`) and
-   token, then **Test** → **Save**.
+   token. Settings save automatically when you close the settings panel; Chrome
+   then prompts you to grant access to that Forge origin (scoped host access).
 4. Open a photo in Immich (`…/photos/<id>`) — the icon lights up (colored).
    Click it to forge that photo.
 
@@ -58,14 +62,13 @@ src/sidepanel/             React UI
 
 ## Notes
 
-- Cross-origin calls to Forge work via `host_permissions`; tighten
-  `allow_origins` on the server and the host pattern in the manifest for
-  production.
+- Cross-origin calls to Forge work via `optional_host_permissions`, requested at
+  runtime scoped to the user's Forge origin (see `lib/host-permissions.ts`). The
+  server keeps CORS closed by default — the extension doesn't rely on it.
 - Job polling currently lives in the side panel. To survive the panel closing,
   move polling into the service worker and persist job ids in
   `chrome.storage.session` (noted in `service-worker.ts`).
 - Toolbar icons are the "F" logo in two states (active/gradient, inactive/grey),
   committed under `public/icons/`. The design sheet and the generator that
-  produces them live outside this repo at `~/git/tools/immich-forge-icons/`
-  (see its README); they're copied verbatim from `public/icons/` into
-  `dist/icons/` at build.
+  produces them are maintained separately; the committed PNGs are copied verbatim
+  from `public/icons/` into `dist/icons/` at build.

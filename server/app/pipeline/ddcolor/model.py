@@ -1,3 +1,6 @@
+# Vendored from DDColor (https://github.com/piddnad/DDColor), Apache-2.0.
+# Modified: imports rewritten from `basicsr.archs.ddcolor_arch_utils.*` to the
+# local `.arch_utils.*` to drop the basicsr/timm dependency. See ./NOTICE.md.
 import torch
 import torch.nn as nn
 

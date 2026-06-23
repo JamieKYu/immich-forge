@@ -1,8 +1,17 @@
-# Immich Forge
+# Forge for Immich
 
 A companion to [Immich](https://immich.app) that "forges" low-quality photos —
 **upscale**, **face-restore**, and **colorize** old or blurry images on your own
 GPU, then stacks the enhanced result as the new primary asset in your library.
+
+> **Unofficial / independent project.** "Forge for Immich" is a community-built
+> companion. It is **not affiliated with, endorsed by, or sponsored by** Immich
+> or FUTO. "Immich" is a trademark of its respective owner; it is used here only
+> to describe interoperability.
+
+**Your originals are never modified or deleted.** Forge uploads the enhanced copy
+as a *new* asset and stacks it as the primary; the original stays in the stack.
+Unstack in Immich at any time to revert.
 
 ## Architecture
 
@@ -47,10 +56,33 @@ npm install
 npm run build                 # load extension/dist as an unpacked extension in Chrome
 ```
 
-## Status
+`FORGE_API_TOKEN` is **required** — the server fails closed (HTTP 503) without
+it, so the Immich proxy is never exposed unauthenticated. Generate one with
+`openssl rand -hex 32`.
 
-Milestone 1–2 scaffold: end-to-end upscale + Immich round-trip. The GPU pipeline
-ships with **classical-CV fallbacks** (Lanczos upscale, etc.) so the whole loop
-runs and is testable *before* you download the deep-learning model weights. Swap
-in Real-ESRGAN / GFPGAN-CodeFormer / DeOldify by dropping weights into
-`server/weights/` and setting the backend env vars.
+The GPU pipeline ships with **classical-CV fallbacks** (Lanczos upscale, etc.) so
+the whole loop runs and is testable *before* you download the deep-learning model
+weights. Enable the deep models by dropping weights into `server/weights/` and
+setting the backend env vars.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+### Third-party components
+
+Forge talks to Immich **only over its public REST API** — no Immich source code
+is included — so this project's license is independent of Immich's.
+
+Model code and weights it can use carry their own licenses; review them before
+redistribution or commercial use:
+
+| Component | Used as | License |
+| --- | --- | --- |
+| DDColor (colorize) | vendored under `server/app/pipeline/ddcolor/` | Apache-2.0 ([LICENSE](server/app/pipeline/ddcolor/LICENSE)) |
+| Real-ESRGAN (upscale) | pip dependency + downloaded weights | BSD-3-Clause |
+| GFPGAN (face restore) | pip dependency + downloaded weights | Apache-2.0 |
+| CodeFormer (optional face backend) | downloaded weights | **S-Lab License 1.0 — non-commercial** |
+
+> ⚠️ The optional CodeFormer backend's weights are licensed for **non-commercial
+> use only**. The default face backend is GFPGAN.
