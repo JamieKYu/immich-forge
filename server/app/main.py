@@ -52,21 +52,32 @@ async def lifespan(app: FastAPI):
         await immich.aclose()
 
 
-app = FastAPI(title="Immich Forge", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Forge for Immich", version="0.1.0", lifespan=lifespan)
 
-# The extension talks only to Forge; allow the extension origin(s).
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # tighten to chrome-extension://<id> in production
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS is OFF by default. The extension reaches Forge through its granted host
+# permission (not subject to CORS), so we don't need to open the API to web
+# origins — doing so would let any website read the Immich proxy responses.
+# Set FORGE_CORS_ORIGINS (comma-separated) only if a non-extension web client
+# needs access.
+_cors = get_settings().cors_origin_list
+if _cors:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 def require_token(request: Request) -> None:
     settings = request.app.state.settings
+    # Fail closed: an unset token would otherwise expose the Immich-proxy
+    # endpoints (and the user's whole library) without authentication.
     if not settings.forge_api_token:
-        return  # auth disabled (dev)
+        raise HTTPException(
+            status_code=503,
+            detail="FORGE_API_TOKEN is not set; the API is disabled. Set a token to enable it.",
+        )
     sent = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
     if sent != settings.forge_api_token:
         raise HTTPException(status_code=401, detail="invalid forge token")

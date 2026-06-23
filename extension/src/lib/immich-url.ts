@@ -1,7 +1,7 @@
 // Recognize an Immich asset being viewed from a tab URL.
 //
 // We key off the asset UUID in the path rather than the host, because the host
-// the user browses (e.g. http://192.168.50.150:2283) often differs from how the
+// the user browses (e.g. http://immich.local:2283) often differs from how the
 // Forge server reaches Immich internally (e.g. http://immich-server:2283). The
 // UUID is all the server needs.
 //

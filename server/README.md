@@ -27,7 +27,7 @@ round-trip without CUDA or model weights:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-FORGE_DEVICE=cpu FORGE_UPSCALE_BACKEND=lanczos \
+FORGE_API_TOKEN=dev-token FORGE_DEVICE=cpu FORGE_UPSCALE_BACKEND=lanczos \
   FORGE_FACE_BACKEND=none FORGE_COLORIZE_BACKEND=none \
   uvicorn app.main:app --reload
 ```
@@ -45,8 +45,10 @@ FORGE_DEVICE=cpu FORGE_UPSCALE_BACKEND=lanczos \
 | GET  | `/immich/search` | proxied asset search (browser UI) |
 | GET  | `/immich/thumbnail/{id}` | proxied thumbnail |
 
-All non-health endpoints require `Authorization: Bearer $FORGE_API_TOKEN` when a
-token is configured.
+All non-health endpoints require `Authorization: Bearer $FORGE_API_TOKEN`.
+`FORGE_API_TOKEN` is mandatory: if it's unset the API **fails closed** (HTTP 503)
+rather than serving the Immich proxy unauthenticated. CORS is closed by default;
+set `FORGE_CORS_ORIGINS` only if a non-extension web client needs access.
 
 ### Example
 
@@ -88,6 +90,10 @@ DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
 `basicsr`/`timm` dependency, so it doesn't collide with the `basicsr` Real-ESRGAN
 uses. DeOldify was the original plan but needs fastai 1.x / torch 1.x, which is
 incompatible with the torch 2.x this image runs on.
+
+**Model licenses** differ — see the table in the [root README](../README.md#third-party-components).
+Note the optional `codeformer` face backend uses weights under the **non-commercial**
+S-Lab License; the default `gfpgan` backend (Apache-2.0) avoids that restriction.
 
 Each backend falls back to a classical/no-op impl when its weights are missing.
 To enable the deep models: `python scripts/download_weights.py` (or the
