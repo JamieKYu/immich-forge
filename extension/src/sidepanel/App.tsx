@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ForgeClient } from '../lib/forge-client'
 import { loadSettings, saveSettings } from '../lib/storage'
+import { ensureForgeAccess, forgeOriginPattern, hasForgeAccess } from '../lib/host-permissions'
 import {
   type ForgeOperations,
   type ImmichAsset,
@@ -20,6 +21,8 @@ export function App() {
   )
   // True once a forge job is submitted (the review screen is showing).
   const [reviewing, setReviewing] = useState(false)
+  // Whether we hold host access to the configured Forge origin (null = checking).
+  const [access, setAccess] = useState<boolean | null>(null)
   const assetId = useActiveAsset()
   // Latest values being edited in the settings panel, reported up by SettingsView
   // so the header "close" link can save them.
@@ -35,14 +38,25 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    if (!client) return
+    if (!settings?.forgeUrl) {
+      setAccess(true) // nothing to reach yet; settings view will handle setup
+      return
+    }
+    hasForgeAccess(settings.forgeUrl).then(setAccess)
+  }, [settings])
+
+  useEffect(() => {
+    if (!client || access === false) return
     client
       .health()
       .then((h) => setHealth({ forge: h.ok, immich: h.immich }))
       .catch(() => setHealth({ forge: false, immich: false }))
-  }, [settings])
+  }, [settings, access])
 
   async function persist(next: Settings) {
+    // Request host access to the user's Forge origin first, so this call stays
+    // within the click gesture (chrome.permissions.request requires one).
+    if (next.forgeUrl) await ensureForgeAccess(next.forgeUrl)
     await saveSettings(next)
     setSettings(next)
     setShowSettings(false)
@@ -96,6 +110,11 @@ export function App() {
               pending.current = s
             }}
           />
+        ) : access === false ? (
+          <GrantAccess
+            forgeUrl={settings!.forgeUrl}
+            onGranted={() => setAccess(true)}
+          />
         ) : assetId === undefined ? (
           <p className="muted">Detecting current photo…</p>
         ) : assetId === null ? (
@@ -111,6 +130,33 @@ export function App() {
           />
         )}
       </main>
+    </div>
+  )
+}
+
+// Shown when a Forge server is configured but the user hasn't granted host
+// access to its origin yet (fresh install carried a saved URL, or access was
+// revoked). One click re-requests it, scoped to just that origin.
+function GrantAccess({
+  forgeUrl,
+  onGranted,
+}: {
+  forgeUrl: string
+  onGranted: () => void
+}) {
+  const origin = forgeOriginPattern(forgeUrl)?.replace(/\/\*$/, '') ?? forgeUrl
+  async function grant() {
+    if (await ensureForgeAccess(forgeUrl)) onGranted()
+  }
+  return (
+    <div>
+      <p>Allow Forge to connect to your server?</p>
+      <p className="muted">
+        Forge needs permission to reach <code>{origin}</code>.
+      </p>
+      <button className="primary" style={{ width: '100%' }} onClick={grant}>
+        Grant access
+      </button>
     </div>
   )
 }

@@ -1,6 +1,6 @@
-// HTTP client for the Forge server. Runs inside the service worker so that all
-// cross-origin calls go through the extension's host_permissions and job state
-// survives the side panel being closed/reopened.
+// HTTP client for the Forge server. Cross-origin calls reach the user's Forge
+// origin via the optional host permission granted at settings-save time (see
+// lib/host-permissions); without it, fetches fail and the panel prompts to grant.
 
 import type {
   AcceptResponse,

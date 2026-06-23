@@ -1,8 +1,9 @@
 import { defineManifest } from '@crxjs/vite-plugin'
 
-// Host permissions let the service worker call the Forge server cross-origin
-// without CORS friction. The user's actual Forge URL is added at runtime via
-// the optional_host_permissions flow (chrome.permissions.request).
+// The Forge server lives at a user-defined address, so its origin isn't known
+// at build time. Rather than request broad host access up front, we declare it
+// as OPTIONAL and request just the user's Forge origin at runtime (on the
+// settings-save gesture) via chrome.permissions.request — see lib/host-permissions.
 export default defineManifest({
   manifest_version: 3,
   name: 'Forge for Immich',
@@ -11,7 +12,7 @@ export default defineManifest({
   // tabs/webNavigation: detect the asset id in the active tab's URL (incl. SPA
   // navigation). activeAssetId is mirrored into storage.session for the panel.
   permissions: ['storage', 'sidePanel', 'tabs', 'activeTab', 'webNavigation'],
-  host_permissions: ['http://*/*', 'https://*/*'],
+  optional_host_permissions: ['http://*/*', 'https://*/*'],
   background: {
     service_worker: 'src/background/service-worker.ts',
     type: 'module',
