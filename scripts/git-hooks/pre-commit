@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook: run the test suite for whichever subproject has staged
+# changes. Scoped so a docs-only or single-side commit stays fast.
+#
+# Installed via `core.hooksPath`; see scripts/install-git-hooks.sh.
+# Bypass for a single commit with `git commit --no-verify`.
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Staged files (added/copied/modified/renamed), NUL-safe for odd paths.
+staged() { git diff --cached --name-only --diff-filter=ACMR -z; }
+
+changed_in() {
+  local prefix="$1"
+  staged | grep -zq "^${prefix}" 2>/dev/null
+}
+
+ran_any=0
+
+if changed_in "server/"; then
+  ran_any=1
+  echo "pre-commit: running server tests (pytest)…"
+  if [ -x server/.venv/bin/pytest ]; then
+    PYTEST="$REPO_ROOT/server/.venv/bin/pytest"
+  elif command -v pytest >/dev/null 2>&1; then
+    PYTEST="$(command -v pytest)"
+  else
+    echo "pre-commit: pytest not found (expected server/.venv/bin/pytest). Run: python3 -m venv server/.venv && server/.venv/bin/pip install -r server/requirements.txt -r server/requirements-dev.txt" >&2
+    exit 1
+  fi
+  ( cd server && "$PYTEST" )
+fi
+
+if changed_in "extension/"; then
+  ran_any=1
+  echo "pre-commit: running extension tests (vitest)…"
+  if [ ! -d extension/node_modules ]; then
+    echo "pre-commit: extension/node_modules missing. Run: (cd extension && npm install)" >&2
+    exit 1
+  fi
+  ( cd extension && npm run test --silent )
+fi
+
+if [ "$ran_any" -eq 0 ]; then
+  echo "pre-commit: no server/ or extension/ changes staged; skipping tests."
+fi
+
+echo "pre-commit: tests passed."

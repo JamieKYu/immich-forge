@@ -65,6 +65,19 @@ the whole loop runs and is testable *before* you download the deep-learning mode
 weights. Enable the deep models by dropping weights into `server/weights/` and
 setting the backend env vars.
 
+## Git hooks
+
+Run once after cloning to enable the pre-commit hook, which runs the test suite
+for whichever subproject (`server/` and/or `extension/`) has staged changes:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+The server suite expects `server/.venv` with dev deps installed; the extension
+suite expects `extension/node_modules`. Bypass for a single commit with
+`git commit --no-verify`.
+
 ## Releases
 
 Publishing is **tag-gated** and the two components release **independently**,
