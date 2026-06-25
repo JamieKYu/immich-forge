@@ -16,5 +16,9 @@
     "noEmit": true,
     "types": ["chrome", "vite/client"]
   },
-  "include": ["src", "manifest.config.ts", "vite.config.ts"]
+  "include": ["src", "manifest.config.ts", "vite.config.ts"],
+  // Tests are validated at runtime by Vitest (npm test). They're excluded from
+  // the shipping build's typecheck: @types/chrome's callback-overloaded APIs
+  // don't compose with Vitest's mock typings, and test files aren't bundled.
+  "exclude": ["src/**/*.test.ts", "test"]
 }
