@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 from .config import Settings
 from .immich import ImmichClient
+from .metadata import transplant_exif
 from .pipeline import Pipeline
 from .schemas import ForgeOperations, JobInfo, JobStatus
 
@@ -107,9 +108,13 @@ class JobManager:
             job.stage = stage
 
         original = await self.immich.download_original(job.asset_id)
-        job.result_bytes, job.notes = await self.pipeline.run(
+        forged, job.notes = await self.pipeline.run(
             original, job.operations, on_progress
         )
+        # OpenCV re-encodes a bare JPEG, so carry the original's EXIF (GPS,
+        # camera, capture time, orientation) onto the forged result. Best-effort:
+        # returns `forged` unchanged if the original has no transplantable EXIF.
+        job.result_bytes = transplant_exif(original, forged)
         job.status = JobStatus.done
         job.progress = 1.0
         job.stage = "done"

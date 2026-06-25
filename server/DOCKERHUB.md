@@ -51,15 +51,12 @@ curl http://YOUR_SERVER_IP:8000/health
 ## 3. Install the Chrome extension
 
 Install **“Forge for Immich”** from the **Chrome Web Store**:
-
-👉 search the Chrome Web Store for **Forge for Immich** and click **Add to Chrome**.
+https://chromewebstore.google.com/detail/forge-for-immich/ceaoooljelkcaagcljambkdldadpblgc
 
 Then open a single photo in your Immich web app, click the **Forge** toolbar icon, open **settings**, and enter:
 
 - **Forge server URL** — `http://YOUR_SERVER_IP:8000`
 - **Forge API token** — the `FORGE_API_TOKEN` value from step 2
-
-You're ready to forge. 🔨
 
 ---
 
