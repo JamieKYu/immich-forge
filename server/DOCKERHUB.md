@@ -79,6 +79,17 @@ Then open a single photo in your Immich web app, click the **Forge** toolbar ico
 
 The server listens on **port 8000**. `/health` is public; all other endpoints require the `FORGE_API_TOKEN` bearer token when one is set.
 
+## Image tags
+
+Images are published **only on tagged releases** — not on every commit to `main`.
+
+| Tag | Points at |
+| --- | --- |
+| `:latest` | The most recent **tagged release**. Moves only when a new version ships, not on every merge. |
+| `:vX.Y.Z` | A specific release, e.g. `:v1.2.0`. Pin this for reproducible deploys that won't change under you. |
+
+There are **no per-commit `sha-…` tags**: a merge to `main` runs the full test suite but never publishes an image. The examples here use `:latest` for simplicity — pin a `:vX.Y.Z` tag in production.
+
 ## docker compose
 
 ```yaml
