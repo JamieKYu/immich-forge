@@ -67,13 +67,31 @@ setting the backend env vars.
 
 ## Releases
 
-Publishing is **tag-gated** — building locally or merging to `main` never ships
-anything. Pushing a `vX.Y.Z` Git tag is what triggers CI to publish: the server
-Docker image (`jamiekyu/immich-forge:latest` **and** `:vX.Y.Z`) goes to Docker
-Hub, and a GitHub Release draft is created with the packaged extension `.zip`
-(the Chrome Web Store upload stays a manual step). A merge to `main` only runs
-the test suite. Pull `:latest` for the newest release, or pin `:vX.Y.Z` for a
-fixed version.
+Publishing is **tag-gated** and the two components release **independently**,
+each from its own prefixed version tag. Building locally or merging to `main`
+never ships anything — a merge just runs the tests (and uploads the extension
+`.zip` as a build artifact).
+
+| Push this tag | Triggers | Result |
+| --- | --- | --- |
+| `api-vX.Y.Z` | server tests → Docker build | `jamiekyu/immich-forge:latest` **and** `:vX.Y.Z` pushed to Docker Hub |
+| `ext-vX.Y.Z` | extension tests → build | extension `.zip` attached to a **draft** GitHub Release (the Chrome Web Store upload stays a manual step) |
+
+The two families never cross-trigger: an `api-v` tag can't ship the extension,
+and an `ext-v` tag can't ship the image. Cut a release with the helper scripts
+(run them on a clean, up-to-date `main`):
+
+```bash
+scripts/release-server.sh            # patch bump -> pushes api-vX.Y.(Z+1)
+scripts/release-server.sh minor      # -> api-vX.(Y+1).0
+scripts/release-extension.sh 1.0.0   # writes 1.0.0 into the manifest, commits, tags ext-v1.0.0
+```
+
+Both default to a **patch** bump; pass `major`, `minor`, or an explicit `X.Y.Z`.
+The extension script additionally writes the new version into
+`extension/manifest.config.ts` and `extension/package.json` and commits it before
+tagging, so the built `manifest.json` carries the released version. Pull
+`:latest` for the newest server release, or pin `:vX.Y.Z`.
 
 ## License
 

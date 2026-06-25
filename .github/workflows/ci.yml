@@ -1,28 +1,28 @@
 name: CI / Release
 
-# Conservative, strictly-gated pipeline. Three trigger tiers, each with a
-# different blast radius:
+# Conservative, strictly-gated pipeline with INDEPENDENT release tracks for the
+# two components, each driven by its own prefixed version tag:
 #
-#   pull_request            -> TEST ONLY. The gatekeeper. No secrets, no
-#                              publishing — safe for external/fork contributors.
-#   push to main (merge)    -> test, then BUILD the extension and upload the
-#                              .zip as a workflow artifact. NO Docker publish,
-#                              NO Web Store upload. A merge never ships anything.
-#   push tag v*.*.*         -> test, then publish the Docker image (:latest +
-#                              the tag) AND draft a GitHub Release with the
-#                              extension .zip attached. Releasing is a
-#                              deliberate, tag-driven act.
+#   pull_request            -> TEST ONLY (both suites). The gatekeeper. No secrets,
+#                              no publishing — safe for external/fork contributors.
+#   push to main (merge)    -> test both, then BUILD the extension and upload the
+#                              .zip as a workflow artifact. No publish of any kind.
+#   push tag  api-v X.Y.Z   -> test the SERVER, then publish the Docker image
+#                              (:latest + :vX.Y.Z). The extension is untouched.
+#   push tag  ext-v X.Y.Z   -> test the EXTENSION, then build the .zip and attach
+#                              it to a draft GitHub Release. Docker is untouched.
 #
-# Why no publish-on-merge? Auto-pushing :latest on every merge means an untested
-# or half-finished commit can reach users the instant it lands on main. Gating
-# all publication behind an explicit version tag makes shipping a conscious step.
+# The two tag families never cross-trigger: an api-v tag can't ship the extension
+# and an ext-v tag can't ship the image. Use scripts/release-server.sh and
+# scripts/release-extension.sh to cut the tags.
 on:
   pull_request:
   push:
     branches:
       - main
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'api-v[0-9]+.[0-9]+.[0-9]+'
+      - 'ext-v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
 # A newer push to the same ref supersedes an in-flight run.
@@ -34,11 +34,15 @@ env:
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/immich-forge
 
 jobs:
-  # === GATEKEEPER: runs on every event, including fork PRs ======================
-  # These two jobs are the merge gate. They use NO secrets, so they run safely
-  # for external contributors, and branch protection should require both.
+  # === GATEKEEPER ==============================================================
+  # PRs and main-merges run BOTH suites. On a tag we run only the suite for the
+  # component being released (the other is skipped), keeping the tracks independent
+  # and fast. These jobs use NO secrets and are safe for fork PRs; branch
+  # protection should require both.
   test-server:
     name: Test server (pytest)
+    # Skip only when releasing the extension (ext-v tag); runs on PRs, main, api-v.
+    if: ${{ !startsWith(github.ref, 'refs/tags/ext-v') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -66,6 +70,8 @@ jobs:
 
   test-extension:
     name: Test extension (lint + vitest)
+    # Skip only when releasing the server (api-v tag); runs on PRs, main, ext-v.
+    if: ${{ !startsWith(github.ref, 'refs/tags/api-v') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -90,20 +96,19 @@ jobs:
         working-directory: extension
         run: npm test
 
-  # === EXTENSION ARTIFACT: on merge to main and on tags (never on PRs) ==========
-  # Artifact-first delivery: we build a production .zip and stop. The actual push
-  # to the Chrome Web Store stays a manual, human-reviewed step (the store has its
-  # own review process and we never automate uploads to the Google API on merge).
+  # === EXTENSION ARTIFACT / RELEASE ============================================
+  # Runs on main-merges (artifact only) and ext-v tags (artifact + draft release).
+  # Never on a PR, and never on an api-v tag (that's a server-only release).
+  # Artifact-first: the Web Store upload stays a manual, human-reviewed step.
   package-extension:
     name: Package extension (.zip)
-    # Gate on the FULL suite: never emit an artifact (or a release draft) from a
-    # tree where any test is red, even though this job only touches the extension.
-    needs: [test-server, test-extension]
-    # Build the artifact on merges/tags, but never for a pull_request.
-    if: github.event_name != 'pull_request'
+    needs: test-extension
+    if: >-
+      ${{ github.event_name != 'pull_request'
+          && !startsWith(github.ref, 'refs/tags/api-v') }}
     runs-on: ubuntu-latest
     permissions:
-      # Needed only by the tag-gated release step below; the artifact upload
+      # Needed only by the tag-gated draft-release step; the artifact upload
       # itself needs no special scope.
       contents: write
     steps:
@@ -116,6 +121,11 @@ jobs:
           node-version: '20'
           cache: npm
           cache-dependency-path: extension/package-lock.json
+
+      # A clean version label: "ext-v1.2.3" -> "v1.2.3"; on main it's just "main".
+      - name: Derive version label
+        id: label
+        run: echo "value=${GITHUB_REF_NAME#ext-}" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         working-directory: extension
@@ -130,40 +140,36 @@ jobs:
       # Zip the CONTENTS of dist/ so manifest.json lands at the archive root.
       - name: Package dist into a Web Store .zip
         working-directory: extension/dist
-        run: zip -r "../../immich-forge-extension-${{ github.ref_name }}.zip" .
+        run: zip -r "../../immich-forge-extension-${{ steps.label.outputs.value }}.zip" .
 
-      # Always available from the Actions run — this is the conservative delivery
-      # target for ordinary merges.
       - name: Upload .zip as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: immich-forge-extension-${{ github.ref_name }}
-          path: immich-forge-extension-${{ github.ref_name }}.zip
+          name: immich-forge-extension-${{ steps.label.outputs.value }}
+          path: immich-forge-extension-${{ steps.label.outputs.value }}.zip
           retention-days: 30
 
-      # On a version tag ONLY: attach the .zip to a DRAFT GitHub Release. Draft,
-      # not published, so a human reviews and presses the button — and submits to
-      # the Web Store manually.
+      # On an ext-v tag ONLY: attach the .zip to a DRAFT GitHub Release. Draft,
+      # so a human reviews and submits to the Web Store manually.
       - name: Attach .zip to a draft GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/ext-v')
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          name: ${{ github.ref_name }}
-          files: immich-forge-extension-${{ github.ref_name }}.zip
+          name: Extension ${{ steps.label.outputs.value }}
+          files: immich-forge-extension-${{ steps.label.outputs.value }}.zip
           body: |
-            Automated draft. Review before publishing.
+            Automated draft for the Chrome extension. Review before publishing.
 
-            - Chrome extension: attached `.zip` (upload to the Web Store manually).
-            - Server image: `${{ env.IMAGE_NAME }}:${{ github.ref_name }}` on Docker Hub.
+            Upload the attached `.zip` to the Chrome Web Store manually.
 
-  # === DOCKER PUBLISH: tag-gated only ==========================================
-  # Hard requirement: this runs ONLY for a pushed v*.*.* tag, and ONLY after both
-  # test jobs pass. A plain push/merge to main can never reach this job.
+  # === DOCKER PUBLISH ==========================================================
+  # Runs ONLY for a pushed api-v*.*.* tag, and ONLY after the server tests pass.
+  # A merge to main, a PR, or an ext-v tag can never reach this job.
   build-and-push:
     name: Build and push Docker image
-    needs: [test-server, test-extension]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test-server
+    if: startsWith(github.ref, 'refs/tags/api-v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -171,6 +177,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # "api-v1.2.3" -> "v1.2.3" for the image tag.
+      - name: Derive image version
+        id: ver
+        run: echo "value=${GITHUB_REF_NAME#api-}" >> "$GITHUB_OUTPUT"
 
       # The CUDA + Torch image is large (~8-10GB). Reclaim runner disk first so
       # the build doesn't fail with "no space left on device".
@@ -199,10 +210,10 @@ jobs:
           push: true
           # CUDA base + cu124 Torch wheels are x86-64 only; no arm builds.
           platforms: linux/amd64
-          # Per convention: tag with the version (e.g. v1.2.3) and :latest. Both
-          # only ever get pushed from a tag, so :latest always points at a release.
+          # Both tags only ever push from an api-v tag, so :latest always points
+          # at the newest server release.
           tags: |
             ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.value }}
           cache-from: type=gha,scope=immich-forge
           cache-to: type=gha,mode=max,scope=immich-forge,ignore-error=true

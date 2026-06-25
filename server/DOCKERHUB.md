@@ -81,14 +81,14 @@ The server listens on **port 8000**. `/health` is public; all other endpoints re
 
 ## Image tags
 
-Images are published **only on tagged releases** — not on every commit to `main`.
+Images are published **only on a tagged server release** (an `api-vX.Y.Z` git tag) — never on a commit or merge to `main`.
 
 | Tag | Points at |
 | --- | --- |
-| `:latest` | The most recent **tagged release**. Moves only when a new version ships, not on every merge. |
+| `:latest` | The most recent **server release**. Moves only when a new version ships, not on every merge. |
 | `:vX.Y.Z` | A specific release, e.g. `:v1.2.0`. Pin this for reproducible deploys that won't change under you. |
 
-There are **no per-commit `sha-…` tags**: a merge to `main` runs the full test suite but never publishes an image. The examples here use `:latest` for simplicity — pin a `:vX.Y.Z` tag in production.
+There are **no per-commit `sha-…` tags**: a merge to `main` runs the full test suite but never publishes an image. The examples here use `:latest` for simplicity — pin a `:vX.Y.Z` tag in production. (The Chrome extension releases separately under `ext-v*` tags and isn't shipped as a Docker image.)
 
 ## docker compose
 
