@@ -65,6 +65,16 @@ the whole loop runs and is testable *before* you download the deep-learning mode
 weights. Enable the deep models by dropping weights into `server/weights/` and
 setting the backend env vars.
 
+## Releases
+
+Publishing is **tag-gated** — building locally or merging to `main` never ships
+anything. Pushing a `vX.Y.Z` Git tag is what triggers CI to publish: the server
+Docker image (`jamiekyu/immich-forge:latest` **and** `:vX.Y.Z`) goes to Docker
+Hub, and a GitHub Release draft is created with the packaged extension `.zip`
+(the Chrome Web Store upload stays a manual step). A merge to `main` only runs
+the test suite. Pull `:latest` for the newest release, or pin `:vX.Y.Z` for a
+fixed version.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
