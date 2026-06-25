@@ -1,6 +1,6 @@
 {
   "name": "immich-forge-extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browse your Immich library and forge low-quality photos via a self-hosted GPU service.",
   "type": "module",
   "scripts": {
