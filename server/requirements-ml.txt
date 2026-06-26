@@ -15,3 +15,7 @@ facexlib==0.3.0
 
 # Colorization
 # deoldify   # uncomment and pin against its required fastai/torch, ideally isolated
+
+# Denoising — SCUNet is vendored under app/pipeline/scunet/ (no basicsr/timm,
+# like ddcolor). einops is its only non-torch dependency.
+einops==0.8.0

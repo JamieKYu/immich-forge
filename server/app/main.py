@@ -99,6 +99,7 @@ async def health(request: Request):
 async def models(request: Request, _: None = Depends(require_token)):
     s = request.app.state.settings
     return {
+        "denoise": s.denoise_backend,
         "upscale": s.upscale_backend,
         "face": s.face_backend,
         "colorize": s.colorize_backend,

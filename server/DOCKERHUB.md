@@ -1,8 +1,8 @@
 # Forge for Immich — Server
 
-GPU image that **enhances your Immich photos**: AI upscaling, face restoration, and black‑and‑white colorization. It runs as a small broker next to your self‑hosted Immich — it holds your Immich API key so the browser never has to — and pairs with the **Forge for Immich** Chrome extension.
+GPU image that **enhances your Immich photos**: AI denoising, upscaling, face restoration, and black‑and‑white colorization. It runs as a small broker next to your self‑hosted Immich — it holds your Immich API key so the browser never has to — and pairs with the **Forge for Immich** Chrome extension.
 
-`upscale (Real‑ESRGAN) · face restore (GFPGAN) · colorize (DDColor)`
+`denoise (SCUNet) · upscale (Real‑ESRGAN) · face restore (GFPGAN) · colorize (DDColor)`
 
 ---
 

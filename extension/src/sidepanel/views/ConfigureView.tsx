@@ -19,6 +19,7 @@ export function ConfigureView({
   const [error, setError] = useState<string | null>(null)
 
   const summary = [
+    operations.denoise && (operations.low_light ? 'denoise + low-light' : 'denoise'),
     operations.colorize && 'colorize',
     operations.upscale && `upscale ×${operations.upscale_factor}`,
     operations.face_restore && 'face restore',
