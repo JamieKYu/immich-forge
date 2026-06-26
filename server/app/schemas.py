@@ -16,8 +16,19 @@ class JobStatus(str, Enum):
 class ForgeOperations(BaseModel):
     """Which enhancement stages to run, and their parameters.
 
-    Stages run in a fixed sensible order: colorize -> upscale -> face_restore.
+    Stages run in a fixed sensible order: denoise -> colorize -> face_restore
+    -> upscale. Denoise is first so later stages (and the upscaler especially)
+    don't amplify sensor noise.
     """
+
+    # Denoise / low-light. Runs first. `denoise_strength` blends the denoised
+    # result back toward the original (1 = fully denoised, 0 = original) so the
+    # model's smoothing can be dialled down. `low_light` adds a classical
+    # CLAHE + gamma brightening pass (SCUNet/NAFNet only denoise, they don't
+    # brighten), applied after denoising.
+    denoise: bool = False
+    denoise_strength: float = Field(1.0, ge=0.0, le=1.0)
+    low_light: bool = False
 
     colorize: bool = False
 

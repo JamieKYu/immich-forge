@@ -67,7 +67,7 @@ def test_models_rejects_wrong_token(client):
 def test_models_accepts_correct_token(client):
     r = client.get("/models", headers=AUTH)
     assert r.status_code == 200
-    assert set(r.json()) == {"upscale", "face", "colorize"}
+    assert set(r.json()) == {"denoise", "upscale", "face", "colorize"}
 
 
 def test_api_disabled_when_token_unset(client):

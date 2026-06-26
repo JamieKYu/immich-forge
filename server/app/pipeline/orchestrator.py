@@ -1,7 +1,10 @@
 """Runs the selected enhancement stages in a sensible fixed order.
 
-Order: colorize -> face_restore -> upscale.
-  - colorize first gives the later stages real color to work with (DDColor runs
+Order: denoise -> colorize -> face_restore -> upscale.
+  - denoise first: it removes sensor noise on the original-resolution image so
+    the later stages — colorize, face detection, and the upscaler especially —
+    don't amplify it. It's tiled, so VRAM stays bounded on large sources;
+  - colorize next gives the later stages real color to work with (DDColor runs
     at a fixed 512px internally, so its VRAM is independent of source size);
   - face_restore second runs face *detection* on the original-resolution image.
     Doing it after a 4x upscale meant detecting faces on a ~300MP image, which
@@ -24,6 +27,7 @@ import numpy as np
 from ..config import Settings
 from ..schemas import ForgeOperations
 from .colorize import Colorizer
+from .denoise import Denoiser
 from .face_restore import FaceRestorer
 from .upscale import Upscaler
 
@@ -45,6 +49,9 @@ class Pipeline:
         )
         self.colorizer = Colorizer(
             settings.colorize_backend, settings.weights_dir, settings.device
+        )
+        self.denoiser = Denoiser(
+            settings.denoise_backend, settings.weights_dir, settings.device, tile,
         )
         # Serialize GPU access across jobs.
         self._gpu = asyncio.Semaphore(settings.max_concurrent_gpu_jobs)
@@ -84,6 +91,7 @@ class Pipeline:
             )
 
         stages = [s for s, on in (
+            ("denoise", ops.denoise),
             ("colorize", ops.colorize),
             ("face_restore", ops.face_restore),
             ("upscale", ops.upscale),
@@ -95,7 +103,9 @@ class Pipeline:
         progress(0.0, "starting")
         for i, stage in enumerate(stages):
             progress(i / len(stages), stage)
-            if stage == "colorize":
+            if stage == "denoise":
+                img = self.denoiser(img, ops.denoise_strength, ops.low_light)
+            elif stage == "colorize":
                 img = self.colorizer(img)
             elif stage == "face_restore":
                 img = self.face(img, ops.face_fidelity)

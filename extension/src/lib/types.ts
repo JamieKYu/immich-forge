@@ -1,6 +1,9 @@
 // Mirrors the Forge server's Pydantic schemas.
 
 export interface ForgeOperations {
+  denoise: boolean
+  denoise_strength: number // 0..1 (blend denoised result toward original)
+  low_light: boolean // classical CLAHE + gamma brighten, after denoise
   colorize: boolean
   upscale: boolean
   upscale_factor: 2 | 4
@@ -42,6 +45,9 @@ export interface Settings {
 }
 
 export const DEFAULT_OPERATIONS: ForgeOperations = {
+  denoise: false,
+  denoise_strength: 1,
+  low_light: false,
   colorize: false,
   upscale: true,
   upscale_factor: 4,

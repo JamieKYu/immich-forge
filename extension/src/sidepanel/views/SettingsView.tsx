@@ -56,6 +56,36 @@ export function SettingsView({
       <label style={{ marginTop: 16 }}>Default enhancements</label>
 
       <div className="setting">
+        <span>Denoise &amp; low-light</span>
+        <Switch checked={operations.denoise} onChange={(v) => set({ denoise: v })} />
+      </div>
+      {operations.denoise && (
+        <div className="suboption">
+          <label style={{ margin: '0 0 4px' }}>
+            Strength ({operations.denoise_strength.toFixed(2)}) — lower keeps more
+            original detail
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={operations.denoise_strength}
+            onChange={(e) => set({ denoise_strength: Number(e.target.value) })}
+            style={{ width: '100%' }}
+          />
+          <label className="row" style={{ gap: 8, marginTop: 8 }}>
+            <input
+              type="checkbox"
+              checked={operations.low_light}
+              onChange={(e) => set({ low_light: e.target.checked })}
+            />
+            Brighten low-light (CLAHE + gamma)
+          </label>
+        </div>
+      )}
+
+      <div className="setting">
         <span>Colorize</span>
         <Switch checked={operations.colorize} onChange={(v) => set({ colorize: v })} />
       </div>

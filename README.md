@@ -1,8 +1,9 @@
 # Forge for Immich
 
 A companion to [Immich](https://immich.app) that "forges" low-quality photos —
-**upscale**, **face-restore**, and **colorize** old or blurry images on your own
-GPU, then stacks the enhanced result as the new primary asset in your library.
+**denoise**, **upscale**, **face-restore**, and **colorize** old, noisy, or
+blurry images on your own GPU, then stacks the enhanced result as the new primary
+asset in your library.
 
 > **Unofficial / independent project.** "Forge for Immich" is a community-built
 > companion. It is **not affiliated with, endorsed by, or sponsored by** Immich
@@ -120,6 +121,7 @@ redistribution or commercial use:
 
 | Component | Used as | License |
 | --- | --- | --- |
+| SCUNet (denoise) | vendored under `server/app/pipeline/scunet/` | Apache-2.0 ([LICENSE](server/app/pipeline/scunet/LICENSE)) |
 | DDColor (colorize) | vendored under `server/app/pipeline/ddcolor/` | Apache-2.0 ([LICENSE](server/app/pipeline/ddcolor/LICENSE)) |
 | Real-ESRGAN (upscale) | pip dependency + downloaded weights | BSD-3-Clause |
 | GFPGAN (face restore) | pip dependency + downloaded weights | Apache-2.0 |

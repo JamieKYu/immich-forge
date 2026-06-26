@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Backend selection per stage. Each falls back to a classical-CV impl
     # when the deep model / weights are unavailable.
+    denoise_backend: str = Field("scunet", alias="FORGE_DENOISE_BACKEND")      # scunet|nlm|none
     upscale_backend: str = Field("realesrgan", alias="FORGE_UPSCALE_BACKEND")  # realesrgan|lanczos
     face_backend: str = Field("gfpgan", alias="FORGE_FACE_BACKEND")            # gfpgan|codeformer|none
     colorize_backend: str = Field("ddcolor", alias="FORGE_COLORIZE_BACKEND")   # ddcolor|none

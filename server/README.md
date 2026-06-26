@@ -69,10 +69,12 @@ curl -s -X POST $API/forge/$JOB/accept -H "Authorization: Bearer $TOKEN" | jq
 
 ## Pipeline order
 
-`colorize → face_restore → upscale`, all exchanging BGR uint8 ndarrays. Face
-restore runs *before* upscale so face detection works on the original-resolution
-image — detecting faces on a 4×-upscaled (~300MP) image OOMs the GPU. Upscale is
-last and tiled (`FORGE_TILE_SIZE`).
+`denoise → colorize → face_restore → upscale`, all exchanging BGR uint8 ndarrays.
+Denoise runs *first* so sensor noise is removed before later stages — the
+upscaler especially — amplify it; it's tiled (`FORGE_TILE_SIZE`) so VRAM stays
+bounded on large sources. Face restore runs *before* upscale so face detection
+works on the original-resolution image — detecting faces on a 4×-upscaled
+(~300MP) image OOMs the GPU. Upscale is last and tiled.
 
 A single GPU semaphore serializes jobs, the CUDA cache is freed between stages,
 and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS`
@@ -82,6 +84,7 @@ and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS
 
 | Stage | Backend | Source |
 |-------|---------|--------|
+| denoise | SCUNet (`scunet` \| `nlm` \| `none`) | **vendored** under `app/pipeline/scunet/` + `scunet_color_real_psnr.pth` |
 | upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `realesrgan` + `RealESRGAN_x4plus.pth` |
 | face restore | GFPGAN (`gfpgan` \| `codeformer` \| `none`) | pip `gfpgan` + `GFPGANv1.4.pth` |
 | colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
@@ -90,6 +93,15 @@ DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
 `basicsr`/`timm` dependency, so it doesn't collide with the `basicsr` Real-ESRGAN
 uses. DeOldify was the original plan but needs fastai 1.x / torch 1.x, which is
 incompatible with the torch 2.x this image runs on.
+
+SCUNet (Swin-Conv-UNet) is vendored the same way — torch + `einops` only, with
+`timm`'s `trunc_normal_`/`DropPath` inlined. It's a *blind* real-image denoiser,
+so it needs no noise-level input. The denoise stage's classical fallback is a
+real denoiser (OpenCV Non-Local Means), so a missing weight degrades to `nlm`
+rather than a no-op. SCUNet/NAFNet-style models denoise but don't brighten, so
+**low-light enhancement is a classical CLAHE + gamma pass** (`low_light`) applied
+after denoising. `denoise_strength` (0–1) blends the denoised result back toward
+the original to soften over-smoothing.
 
 **Model licenses** differ — see the table in the [root README](../README.md#third-party-components).
 Note the optional `codeformer` face backend uses weights under the **non-commercial**

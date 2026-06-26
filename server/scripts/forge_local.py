@@ -4,10 +4,10 @@
 The fastest way to confirm the GPU / model wiring works before testing the full
 extension → server → Immich loop.
 
-    python scripts/forge_local.py input.jpg output.jpg --face --upscale 4
+    python scripts/forge_local.py input.jpg output.jpg --denoise --face --upscale 4
 
 Requires the ML deps + weights for the stages you enable; otherwise those stages
-fall back (upscale -> Lanczos, face -> no-op) and it still runs.
+fall back (denoise -> NLM, upscale -> Lanczos, face -> no-op) and it still runs.
 """
 from __future__ import annotations
 
@@ -28,6 +28,9 @@ async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("input", type=Path)
     ap.add_argument("output", type=Path)
+    ap.add_argument("--denoise", action="store_true")
+    ap.add_argument("--denoise-strength", type=float, default=1.0, help="0..1 blend")
+    ap.add_argument("--low-light", action="store_true", help="CLAHE + gamma brighten")
     ap.add_argument("--colorize", action="store_true")
     ap.add_argument("--upscale", type=int, default=0, help="factor 2 or 4 (0 = off)")
     ap.add_argument("--face", action="store_true")
@@ -35,6 +38,9 @@ async def main() -> int:
     args = ap.parse_args()
 
     ops = ForgeOperations(
+        denoise=args.denoise,
+        denoise_strength=args.denoise_strength,
+        low_light=args.low_light,
         colorize=args.colorize,
         upscale=args.upscale > 0,
         upscale_factor=args.upscale if args.upscale in (2, 4) else 4,
