@@ -7,7 +7,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 export default defineManifest({
   manifest_version: 3,
   name: 'Forge for Immich',
-  version: '0.1.1',
+  version: '0.1.2',
   description: 'Forge low-quality Immich photos: denoise, upscale, face-restore, colorize.',
   // tabs/webNavigation: detect the asset id in the active tab's URL (incl. SPA
   // navigation). activeAssetId is mirrored into storage.session for the panel.
