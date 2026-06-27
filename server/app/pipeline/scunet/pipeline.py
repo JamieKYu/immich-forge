@@ -38,7 +38,9 @@ def build_scunet_model(model_path: str, device, *, in_nc: int = 3):
     than silently producing garbage.
     """
     model = SCUNet(in_nc=in_nc, config=[4, 4, 4, 4, 4, 4, 4], dim=64)
-    state_dict = torch.load(model_path, map_location="cpu")
+    # weights_only=False: the checkpoint is a trusted release artifact (fetched
+    # by download_weights.py); silences torch's pickle FutureWarning.
+    state_dict = torch.load(model_path, map_location="cpu", weights_only=False)
     if isinstance(state_dict, dict) and "params" in state_dict:
         state_dict = state_dict["params"]
     model.load_state_dict(state_dict, strict=True)
@@ -82,7 +84,10 @@ class ScunetPipeline:
                 tile = max(_MIN_TILE, (tile or max(h, w)) // 2)
                 log.warning("denoise OOM; retrying at tile=%d", tile)
 
-        out = out.clamp_(0.0, 1.0).mul_(255.0).round_().squeeze(0)
+        # Non-in-place ops: `out` was produced inside torch.inference_mode(), so
+        # it's an "inference tensor" and PyTorch forbids in-place updates to it
+        # out here. clamp()/mul()/round() return a fresh, normal tensor.
+        out = out.clamp(0.0, 1.0).mul(255.0).round().squeeze(0)
         out_rgb = out.permute(1, 2, 0).byte().cpu().numpy()
         return cv2.cvtColor(out_rgb, cv2.COLOR_RGB2BGR)
 
