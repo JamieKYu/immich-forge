@@ -47,3 +47,11 @@ def test_gfpgan_missing_weight_is_noop():
     img = _img()
     out = _restorer("gfpgan")(img, fidelity=0.5)
     assert np.array_equal(out, img)
+
+
+def test_combo_missing_weights_is_noop():
+    img = _img()
+    # gfpgan+codeformer with neither weight present: both passes skip, input
+    # is returned unchanged (degrade-to-available also covers the one-present case).
+    out = _restorer("gfpgan+codeformer")(img, fidelity=0.4)
+    assert np.array_equal(out, img)

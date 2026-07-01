@@ -86,7 +86,7 @@ and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS
 |-------|---------|--------|
 | denoise | SCUNet (`scunet` \| `nlm` \| `none`) | **vendored** under `app/pipeline/scunet/` + `scunet_color_real_psnr.pth` |
 | upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `realesrgan` + `RealESRGAN_x4plus.pth` |
-| face restore | CodeFormer (`codeformer` \| `gfpgan` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or pip `gfpgan` + `GFPGANv1.4.pth` |
+| face restore | CodeFormer (`codeformer` \| `gfpgan` \| `gfpgan+codeformer` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or pip `gfpgan` + `GFPGANv1.4.pth` |
 | colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
 
 DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
@@ -109,6 +109,12 @@ driven via `facexlib` (detection/align/paste-back) + `basicsr` img helpers. It's
 the default because it's the only face backend that honors `face_fidelity` (its
 `w` knob: 0 = max quality/most restored, 1 = closest to the original face).
 GFPGAN has no such control and ignores `face_fidelity` entirely.
+
+`gfpgan+codeformer` runs both in sequence — GFPGAN first (it's good at fixing
+eye positioning / facial symmetry but leaves a smooth "plastic" skin), then
+CodeFormer over that result to add realistic skin texture back. `face_fidelity`
+drives the CodeFormer pass here, so set it **low** (~0.3-0.5) to let the prior
+add texture. If either weight is absent the stage degrades to whichever loaded.
 
 **Model licenses** differ — see the table in the [root README](../README.md#third-party-components).
 Note the **default** `codeformer` face backend uses code + weights under the

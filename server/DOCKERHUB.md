@@ -72,7 +72,7 @@ Then open a single photo in your Immich web app, click the **Forge** toolbar ico
 | `FORGE_TILE_SIZE` | `512` | Upscale tile size; lower it (e.g. `256`) if you hit GPU out‑of‑memory. |
 | `FORGE_MAX_OUTPUT_PIXELS` | `100000000` | Caps output size; the upscale factor is clamped to fit. |
 | `FORGE_UPSCALE_BACKEND` | `realesrgan` | `realesrgan` or `lanczos`. |
-| `FORGE_FACE_BACKEND` | `codeformer` | `codeformer` (honors Fidelity; non-commercial S-Lab license), `gfpgan` (Apache-2.0; ignores Fidelity), or `none`. |
+| `FORGE_FACE_BACKEND` | `codeformer` | `codeformer` (honors Fidelity; non-commercial S-Lab license), `gfpgan` (Apache-2.0; ignores Fidelity), `gfpgan+codeformer` (GFPGAN structure then CodeFormer texture; set Fidelity low ~0.3-0.5), or `none`. |
 | `FORGE_COLORIZE_BACKEND` | `ddcolor` | `ddcolor` or `none`. |
 | `FORGE_MAX_CONCURRENT_GPU_JOBS` | `1` | Simultaneous GPU jobs. |
 | `FORGE_JOB_TTL_SECONDS` | `3600` | How long finished results are kept. |
