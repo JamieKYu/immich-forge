@@ -9,7 +9,11 @@
 realesrgan==0.3.0
 basicsr==1.4.2
 
-# Face restoration (CodeFormer shares GFPGAN's runtime; facexlib does detection)
+# Face restoration.
+#  - gfpgan: default backend, drives GFPGANv1.4 end-to-end.
+#  - CodeFormer is vendored under app/pipeline/codeformer/ (like scunet/ddcolor)
+#    and driven directly via facexlib (detection/align/paste-back) + basicsr
+#    (img<->tensor helpers); basicsr is already pulled in by Real-ESRGAN above.
 gfpgan==1.3.8
 facexlib==0.3.0
 

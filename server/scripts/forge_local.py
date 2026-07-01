@@ -34,7 +34,7 @@ async def main() -> int:
     ap.add_argument("--colorize", action="store_true")
     ap.add_argument("--upscale", type=int, default=0, help="factor 2 or 4 (0 = off)")
     ap.add_argument("--face", action="store_true")
-    ap.add_argument("--fidelity", type=float, default=0.5)
+    ap.add_argument("--fidelity", type=float, default=0.85)
     args = ap.parse_args()
 
     ops = ForgeOperations(
