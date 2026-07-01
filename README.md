@@ -124,8 +124,11 @@ redistribution or commercial use:
 | SCUNet (denoise) | vendored under `server/app/pipeline/scunet/` | Apache-2.0 ([LICENSE](server/app/pipeline/scunet/LICENSE)) |
 | DDColor (colorize) | vendored under `server/app/pipeline/ddcolor/` | Apache-2.0 ([LICENSE](server/app/pipeline/ddcolor/LICENSE)) |
 | Real-ESRGAN (upscale) | pip dependency + downloaded weights | BSD-3-Clause |
-| GFPGAN (face restore) | pip dependency + downloaded weights | Apache-2.0 |
-| CodeFormer (optional face backend) | downloaded weights | **S-Lab License 1.0 — non-commercial** |
+| CodeFormer (face restore, **default**) | vendored under `server/app/pipeline/codeformer/` + downloaded weights | **S-Lab License 1.0 — non-commercial** |
+| GFPGAN (alternative face backend) | pip dependency + downloaded weights | Apache-2.0 |
 
-> ⚠️ The optional CodeFormer backend's weights are licensed for **non-commercial
-> use only**. The default face backend is GFPGAN.
+> ⚠️ The **default** face backend is CodeFormer, whose code and weights are
+> licensed for **non-commercial use only** (S-Lab License 1.0). CodeFormer is
+> the default because it's the only backend that honors the Fidelity control —
+> GFPGAN has no such knob. For commercial use, set `FORGE_FACE_BACKEND=gfpgan`
+> (Apache-2.0); the Fidelity slider then has no effect.

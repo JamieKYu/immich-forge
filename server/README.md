@@ -86,7 +86,7 @@ and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS
 |-------|---------|--------|
 | denoise | SCUNet (`scunet` \| `nlm` \| `none`) | **vendored** under `app/pipeline/scunet/` + `scunet_color_real_psnr.pth` |
 | upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `realesrgan` + `RealESRGAN_x4plus.pth` |
-| face restore | GFPGAN (`gfpgan` \| `codeformer` \| `none`) | pip `gfpgan` + `GFPGANv1.4.pth` |
+| face restore | CodeFormer (`codeformer` \| `gfpgan` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or pip `gfpgan` + `GFPGANv1.4.pth` |
 | colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
 
 DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
@@ -103,9 +103,17 @@ rather than a no-op. SCUNet/NAFNet-style models denoise but don't brighten, so
 after denoising. `denoise_strength` (0–1) blends the denoised result back toward
 the original to soften over-smoothing.
 
+CodeFormer (default face backend) is vendored the same way — the arch is copied
+from sczhou/CodeFormer with the `basicsr` registry decorators stripped, and it's
+driven via `facexlib` (detection/align/paste-back) + `basicsr` img helpers. It's
+the default because it's the only face backend that honors `face_fidelity` (its
+`w` knob: 0 = max quality/most restored, 1 = closest to the original face).
+GFPGAN has no such control and ignores `face_fidelity` entirely.
+
 **Model licenses** differ — see the table in the [root README](../README.md#third-party-components).
-Note the optional `codeformer` face backend uses weights under the **non-commercial**
-S-Lab License; the default `gfpgan` backend (Apache-2.0) avoids that restriction.
+Note the **default** `codeformer` face backend uses code + weights under the
+**non-commercial** S-Lab License; switch to `gfpgan` (Apache-2.0) for commercial
+use — the Fidelity control then has no effect.
 
 Each backend falls back to a classical/no-op impl when its weights are missing.
 To enable the deep models: `python scripts/download_weights.py` (or the

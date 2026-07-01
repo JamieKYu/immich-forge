@@ -2,7 +2,7 @@
 
 GPU image that **enhances your Immich photos**: AI denoising, upscaling, face restoration, and black‑and‑white colorization. It runs as a small broker next to your self‑hosted Immich — it holds your Immich API key so the browser never has to — and pairs with the **Forge for Immich** Chrome extension.
 
-`denoise (SCUNet) · upscale (Real‑ESRGAN) · face restore (GFPGAN) · colorize (DDColor)`
+`denoise (SCUNet) · upscale (Real‑ESRGAN) · face restore (CodeFormer) · colorize (DDColor)`
 
 ---
 
@@ -72,7 +72,7 @@ Then open a single photo in your Immich web app, click the **Forge** toolbar ico
 | `FORGE_TILE_SIZE` | `512` | Upscale tile size; lower it (e.g. `256`) if you hit GPU out‑of‑memory. |
 | `FORGE_MAX_OUTPUT_PIXELS` | `100000000` | Caps output size; the upscale factor is clamped to fit. |
 | `FORGE_UPSCALE_BACKEND` | `realesrgan` | `realesrgan` or `lanczos`. |
-| `FORGE_FACE_BACKEND` | `gfpgan` | `gfpgan`, `codeformer`, or `none`. |
+| `FORGE_FACE_BACKEND` | `codeformer` | `codeformer` (honors Fidelity; non-commercial S-Lab license), `gfpgan` (Apache-2.0; ignores Fidelity), or `none`. |
 | `FORGE_COLORIZE_BACKEND` | `ddcolor` | `ddcolor` or `none`. |
 | `FORGE_MAX_CONCURRENT_GPU_JOBS` | `1` | Simultaneous GPU jobs. |
 | `FORGE_JOB_TTL_SECONDS` | `3600` | How long finished results are kept. |
