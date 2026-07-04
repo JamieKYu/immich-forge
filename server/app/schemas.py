@@ -37,7 +37,10 @@ class ForgeOperations(BaseModel):
 
     face_restore: bool = False
     # CodeFormer fidelity<->quality knob (0 = max quality, 1 = max fidelity).
-    face_fidelity: float = Field(0.5, ge=0.0, le=1.0)
+    # Default leans strongly toward fidelity: lower values hallucinate facial
+    # detail (esp. eyes) from the prior; 0.85 keeps features close to the
+    # original while still cleaning up the face.
+    face_fidelity: float = Field(0.85, ge=0.0, le=1.0)
 
 
 class ForgeRequest(BaseModel):

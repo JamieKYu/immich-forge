@@ -39,7 +39,12 @@ class Settings(BaseSettings):
     # when the deep model / weights are unavailable.
     denoise_backend: str = Field("scunet", alias="FORGE_DENOISE_BACKEND")      # scunet|nlm|none
     upscale_backend: str = Field("realesrgan", alias="FORGE_UPSCALE_BACKEND")  # realesrgan|lanczos
-    face_backend: str = Field("gfpgan", alias="FORGE_FACE_BACKEND")            # gfpgan|codeformer|none
+    # codeformer default: it honours the face_fidelity knob (GFPGAN ignores it).
+    # gfpgan+codeformer runs both (GFPGAN for structure, then CodeFormer for
+    # texture; face_fidelity drives the CodeFormer pass).
+    # NOTE: CodeFormer is S-Lab License 1.0 (non-commercial); set gfpgan for
+    # commercial use.
+    face_backend: str = Field("codeformer", alias="FORGE_FACE_BACKEND")        # codeformer|gfpgan|gfpgan+codeformer|none
     colorize_backend: str = Field("ddcolor", alias="FORGE_COLORIZE_BACKEND")   # ddcolor|none
 
     # --- Jobs ---
