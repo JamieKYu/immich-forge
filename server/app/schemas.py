@@ -54,6 +54,17 @@ class ForgeRequest(BaseModel):
     operations: ForgeOperations = ForgeOperations()
 
 
+class ForgeAnalysis(BaseModel):
+    """Result of the pre-submit source-quality precheck (see pipeline/quality.py).
+
+    `low_quality` is the only field the UI acts on — it drives a generic, soft,
+    non-blocking "results may be limited" note. `metrics` carries the raw scores
+    for debugging/tuning."""
+
+    low_quality: bool
+    metrics: dict[str, float] = {}
+
+
 class JobInfo(BaseModel):
     job_id: str
     asset_id: str

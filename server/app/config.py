@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     face_backend: str = Field("codeformer", alias="FORGE_FACE_BACKEND")        # codeformer|gfpgan|gfpgan+codeformer|none
     colorize_backend: str = Field("ddcolor", alias="FORGE_COLORIZE_BACKEND")   # ddcolor|none
 
+    # --- Source-quality precheck (heuristic; see pipeline/quality.py) ---
+    # An image is flagged low-quality if it fails ANY bar. Defaults lean
+    # conservative (bias toward warning): real libraries skew low-quality, and a
+    # spurious note is harmless since the user is never blocked from forging.
+    quality_sharpness_min: float = Field(100.0, alias="FORGE_QUALITY_SHARPNESS_MIN")
+    quality_hf_ratio_min: float = Field(0.010, alias="FORGE_QUALITY_HF_RATIO_MIN")
+    quality_blockiness_max: float = Field(0.40, alias="FORGE_QUALITY_BLOCKINESS_MAX")
+
     # --- Jobs ---
     job_ttl_seconds: int = Field(3600, alias="FORGE_JOB_TTL_SECONDS")
     max_concurrent_gpu_jobs: int = Field(1, alias="FORGE_MAX_CONCURRENT_GPU_JOBS")

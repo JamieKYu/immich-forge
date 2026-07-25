@@ -7,6 +7,8 @@ context, leaving the app.state we set by hand in place.
 """
 from __future__ import annotations
 
+import cv2
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,9 +19,22 @@ from app.schemas import JobStatus
 AUTH = {"Authorization": "Bearer secret-token"}
 
 
+def _jpeg(img: np.ndarray) -> bytes:
+    ok, buf = cv2.imencode(".jpg", img)
+    assert ok
+    return buf.tobytes()
+
+
 class FakeImmich:
+    def __init__(self, original: bytes | None = None):
+        self._original = original
+
     async def ping(self):
         return True
+
+    async def download_original(self, asset_id: str) -> bytes:
+        assert self._original is not None, "test did not seed an original"
+        return self._original
 
 
 class FakeJob:
@@ -102,3 +117,34 @@ def test_job_result_returns_jpeg_when_ready(client):
     assert r.status_code == 200
     assert r.headers["content-type"] == "image/jpeg"
     assert r.content == b"\xff\xd8x"
+
+
+# --- /analyze precheck -------------------------------------------------------
+
+def test_analyze_requires_token(client):
+    assert client.post("/analyze", json={"asset_id": "a1"}).status_code == 401
+
+
+def test_analyze_flags_flat_image_low_quality(client):
+    flat = np.full((128, 128, 3), 128, np.uint8)
+    app.state.immich = FakeImmich(original=_jpeg(flat))
+    r = client.post("/analyze", headers=AUTH, json={"asset_id": "a1"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["low_quality"] is True
+    assert set(body["metrics"]) >= {"sharpness", "hf_ratio", "blockiness"}
+
+
+def test_analyze_passes_detailed_image(client):
+    rng = np.random.default_rng(1)
+    detailed = rng.integers(0, 256, size=(256, 256, 3), dtype=np.uint8)
+    app.state.immich = FakeImmich(original=_jpeg(detailed))
+    r = client.post("/analyze", headers=AUTH, json={"asset_id": "a1"})
+    assert r.status_code == 200
+    assert r.json()["low_quality"] is False
+
+
+def test_analyze_400_on_undecodable_bytes(client):
+    app.state.immich = FakeImmich(original=b"not an image")
+    r = client.post("/analyze", headers=AUTH, json={"asset_id": "a1"})
+    assert r.status_code == 400
