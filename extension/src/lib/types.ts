@@ -30,6 +30,13 @@ export interface AcceptResponse {
   stack_id: string
 }
 
+// Pre-submit source-quality precheck. `low_quality` drives a soft, non-blocking
+// warning; `metrics` is raw debug data the UI ignores.
+export interface ForgeAnalysis {
+  low_quality: boolean
+  metrics: Record<string, number>
+}
+
 export interface ImmichAsset {
   id: string
   originalFileName: string

@@ -4,6 +4,7 @@
 
 import type {
   AcceptResponse,
+  ForgeAnalysis,
   ForgeOperations,
   ImmichAsset,
   JobInfo,
@@ -70,6 +71,18 @@ export class ForgeClient {
     })
     if (!r.ok) throw new Error(`original ${r.status}`)
     return blobToDataUrl(await r.blob())
+  }
+
+  // Cheap source-quality precheck (CPU-only on the server). Best-effort: callers
+  // treat any failure as "no warning" rather than blocking the Forge flow.
+  async analyze(assetId: string, operations: ForgeOperations): Promise<ForgeAnalysis> {
+    const r = await fetch(`${this.base}/analyze`, {
+      method: 'POST',
+      headers: this.headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ asset_id: assetId, operations }),
+    })
+    if (!r.ok) throw new Error(`analyze ${r.status}`)
+    return r.json()
   }
 
   async forge(assetId: string, operations: ForgeOperations): Promise<JobInfo> {

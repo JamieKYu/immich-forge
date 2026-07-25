@@ -3,6 +3,7 @@
 Endpoints:
   GET  /health                  liveness + Immich connectivity + GPU status
   GET  /models                  which backends/weights are active
+  POST /analyze                 pre-submit source-quality precheck (CPU-only)
   POST /forge                   submit a forge job  -> {job_id}
   GET  /forge/{job_id}          job status / progress
   GET  /forge/{job_id}/result   the forged image bytes (when done)
@@ -15,6 +16,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -27,7 +29,8 @@ from .config import get_settings
 from .immich import ImmichClient, ImmichError
 from .jobs import JobManager
 from .pipeline import Pipeline
-from .schemas import AcceptResponse, ForgeRequest, JobInfo
+from .pipeline.quality import assess_quality
+from .schemas import AcceptResponse, ForgeAnalysis, ForgeRequest, JobInfo
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("forge")
@@ -104,6 +107,41 @@ async def models(request: Request, _: None = Depends(require_token)):
         "face": s.face_backend,
         "colorize": s.colorize_backend,
     }
+
+
+@app.post("/analyze", response_model=ForgeAnalysis)
+async def analyze(req: ForgeRequest, request: Request, _: None = Depends(require_token)):
+    """Cheap source-quality precheck the extension runs before offering Forge, so
+    it can warn when a low-quality original means results will be limited. Pure
+    CPU (no GPU, no model weights) — it never touches the pipeline semaphore, so
+    it stays responsive even while a forge job is running."""
+    immich: ImmichClient = request.app.state.immich
+    settings = request.app.state.settings
+    try:
+        data = await immich.download_original(req.asset_id)
+    except ImmichError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"cannot reach Immich: {exc!r}")
+
+    def _assess() -> ForgeAnalysis:
+        img = Pipeline.decode(data)  # raises ValueError on undecodable bytes
+        report = assess_quality(img, settings)
+        return ForgeAnalysis(
+            low_quality=report.low_quality,
+            metrics={
+                "sharpness": report.sharpness,
+                "hf_ratio": report.hf_ratio,
+                "blockiness": report.blockiness,
+                "width": float(report.width),
+                "height": float(report.height),
+            },
+        )
+
+    try:
+        return await asyncio.to_thread(_assess)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/forge", response_model=JobInfo)
