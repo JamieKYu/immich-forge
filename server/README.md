@@ -69,12 +69,19 @@ curl -s -X POST $API/forge/$JOB/accept -H "Authorization: Bearer $TOKEN" | jq
 
 ## Pipeline order
 
-`denoise → colorize → face_restore → upscale`, all exchanging BGR uint8 ndarrays.
-Denoise runs *first* so sensor noise is removed before later stages — the
-upscaler especially — amplify it; it's tiled (`FORGE_TILE_SIZE`) so VRAM stays
-bounded on large sources. Face restore runs *before* upscale so face detection
-works on the original-resolution image — detecting faces on a 4×-upscaled
-(~300MP) image OOMs the GPU. Upscale is last and tiled.
+`denoise → colorize → (face_restore + upscale)`, all exchanging BGR uint8
+ndarrays. Denoise runs *first* so sensor noise is removed before later stages —
+the upscaler especially — amplify it; it's tiled (`FORGE_TILE_SIZE`) so VRAM
+stays bounded on large sources.
+
+When both **face restore** and **upscale** are enabled they run as a single
+stage: faces are detected/aligned on the original-resolution image (cheap, and
+it avoids detecting on a 4×-upscaled ~300MP image, which OOMs the GPU), the
+**background** is upscaled by Real-ESRGAN, and the restored 512px face crops are
+pasted onto that upscaled canvas *last*. This keeps the *general* upscaler off
+the face pixels — running it over faces turns them waxy/"un-human". If only one
+of the two is enabled it runs on its own (an in-place face restore, or a plain
+upscale). Both are tiled.
 
 A single GPU semaphore serializes jobs, the CUDA cache is freed between stages,
 and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS`

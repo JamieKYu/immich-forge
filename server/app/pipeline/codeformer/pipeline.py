@@ -79,16 +79,35 @@ class CodeFormerPipeline:
             model_rootpath=model_rootpath,
         )
 
-    def restore(self, img_bgr: np.ndarray, fidelity: float) -> np.ndarray:
-        """Restore every detected face in-place. Returns the original image
-        unchanged if no face is found."""
+    def restore(
+        self,
+        img_bgr: np.ndarray,
+        fidelity: float,
+        factor: int = 1,
+        bg_img: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """Restore every detected face and paste it back.
+
+        Faces are always detected/restored on `img_bgr` at the source
+        resolution (a 512px aligned crop each). `factor` scales the paste: the
+        restored crops are warped onto a `factor`x canvas via the helper's
+        inverse affines. Pass `bg_img` as that upscaled canvas (e.g. the
+        Real-ESRGAN output) so the general upscaler only ever touches the
+        background — the restored faces are pasted on top of it last. With
+        `factor=1` / `bg_img=None` this is a plain in-place restore.
+
+        Returns `bg_img` (or the input) unchanged if no face is found, so a
+        combined upscale still yields the upscaled image."""
         self.face_helper.clean_all()
+        # The helper was built at upscale_factor=1; override per call so the
+        # inverse affines and paste target scale to the (upscaled) background.
+        self.face_helper.upscale_factor = factor
         self.face_helper.read_image(img_bgr)
         num_faces = self.face_helper.get_face_landmarks_5(
             only_center_face=False, resize=640, eye_dist_threshold=5
         )
         if num_faces == 0:
-            return img_bgr
+            return bg_img if bg_img is not None else img_bgr
         self.face_helper.align_warp_face()
 
         for cropped_face in self.face_helper.cropped_faces:
@@ -113,5 +132,9 @@ class CodeFormerPipeline:
         self.face_helper.get_inverse_affine(None)
         # draw_box / face_upsampler kwargs were added in later facexlib; call
         # with only the long-standing `upsample_img` for cross-version safety.
-        restored_img = self.face_helper.paste_faces_to_input_image(upsample_img=None)
-        return restored_img if restored_img is not None else img_bgr
+        # `bg_img` is the upscaled background (already factor x); the helper
+        # resizes it to factor x if needed and warps the restored faces onto it.
+        restored_img = self.face_helper.paste_faces_to_input_image(upsample_img=bg_img)
+        if restored_img is not None:
+            return restored_img
+        return bg_img if bg_img is not None else img_bgr

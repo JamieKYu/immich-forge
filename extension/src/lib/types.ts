@@ -52,7 +52,7 @@ export const DEFAULT_OPERATIONS: ForgeOperations = {
   upscale: true,
   upscale_factor: 4,
   face_restore: false,
-  face_fidelity: 0.85, // lean strongly toward fidelity: lower values hallucinate eyes/detail
+  face_fidelity: 0.95, // lean strongly toward fidelity: lower values let CodeFormer reinvent eyes (mismatched iris colour)
 
 
 }
