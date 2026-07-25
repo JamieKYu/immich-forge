@@ -55,3 +55,29 @@ def test_combo_missing_weights_is_noop():
     # is returned unchanged (degrade-to-available also covers the one-present case).
     out = _restorer("gfpgan+codeformer")(img, fidelity=0.4)
     assert np.array_equal(out, img)
+
+
+def test_missing_backend_with_upscale_falls_back_to_upscaler():
+    # Combined face+upscale path when the face model can't load: the stage must
+    # still honour the requested upscale via the supplied upscaler rather than
+    # silently returning the source resolution. No ML deps are touched (the
+    # missing-weight check short-circuits before any import).
+    img = _img(h=10, w=10)
+    calls: list[int] = []
+
+    def fake_upscaler(im: np.ndarray, factor: int) -> np.ndarray:
+        calls.append(factor)
+        return np.repeat(np.repeat(im, factor, axis=0), factor, axis=1)
+
+    for backend in ("codeformer", "gfpgan", "gfpgan+codeformer"):
+        calls.clear()
+        out = _restorer(backend)(img, fidelity=0.5, factor=2, upscaler=fake_upscaler)
+        assert calls == [2], backend
+        assert out.shape == (20, 20, 3), backend
+
+
+def test_factor_without_upscaler_is_plain_restore():
+    # factor > 1 but no upscaler => no upscale owed, no upscaler calls, in-place.
+    img = _img()
+    out = _restorer("codeformer")(img, fidelity=0.5, factor=4)
+    assert np.array_equal(out, img)

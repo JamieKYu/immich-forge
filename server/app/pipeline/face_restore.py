@@ -18,6 +18,15 @@
 When no model/weights are available this stage is a logged no-op rather than a
 degraded approximation — classical CV cannot meaningfully restore a face.
 All I/O is BGR uint8 (the pipeline convention).
+
+**Combined face+upscale.** When the caller passes a `factor > 1` and an
+`upscaler`, this stage restores *and* upscales in one pass: the background is
+upscaled by Real-ESRGAN and the restored 512px face crops are pasted onto that
+upscaled canvas last. The general upscaler therefore never runs over face
+pixels (which turns them waxy/"un-human"). GFPGAN does this via its own
+`bg_upsampler`; the codeformer / gfpgan+codeformer paths do it via
+`CodeFormerPipeline.restore(..., factor, bg_img)`. With `factor == 1` (or no
+upscaler) it's a plain in-place restore at the source resolution.
 """
 from __future__ import annotations
 
@@ -35,6 +44,22 @@ _USES_GFPGAN = {"gfpgan", "gfpgan+codeformer"}
 _USES_CODEFORMER = {"codeformer", "gfpgan+codeformer"}
 
 
+class _BgUpsamplerAdapter:
+    """Adapts the pipeline's Upscaler to GFPGANer's `bg_upsampler` interface.
+
+    GFPGANer calls ``bg_upsampler.enhance(img, outscale=self.upscale)`` and
+    takes ``[0]`` as the upscaled background. Routing through the Upscaler
+    reuses its Real-ESRGAN tile-ladder + Lanczos fallback rather than
+    Real-ESRGAN's raw enhancer, so the background survives a contended GPU.
+    """
+
+    def __init__(self, upscaler):
+        self._upscaler = upscaler
+
+    def enhance(self, img: np.ndarray, outscale: int = 4, **_):
+        return self._upscaler(img, outscale), None
+
+
 class FaceRestorer:
     def __init__(self, backend: str, weights_dir: Path, device: str):
         self.backend = backend
@@ -44,7 +69,9 @@ class FaceRestorer:
         # Sub-models are loaded lazily and cached; each has an "off" flag set on
         # a permanent failure (missing lib / bad checkpoint) so we don't retry
         # every call. A missing *weight* stays transient (retried, warned once).
-        self._gfpgan = None
+        # GFPGANer bakes the output upscale factor (and its internal face
+        # helper) at construction, so cache one instance per factor.
+        self._gfpgan: dict[int, object] = {}
         self._gfpgan_off = False
         self._codeformer = None
         self._codeformer_off = False
@@ -61,10 +88,20 @@ class FaceRestorer:
         use_cuda = self.device == "cuda" and torch.cuda.is_available()
         return torch.device("cuda" if use_cuda else "cpu")
 
-    def _get_gfpgan(self):
-        """Lazily build the GFPGANer. Returns it, or None if it can't (yet)."""
-        if self._gfpgan is not None or self._gfpgan_off:
-            return self._gfpgan
+    def _get_gfpgan(self, upscale: int = 1, upscaler=None):
+        """Lazily build a GFPGANer for the given output `upscale`. Returns it,
+        or None if it can't (yet). Cached per factor.
+
+        `upscale=1` restores faces in-place (bg untouched) — used standalone
+        without upscaling and as the structure pass of gfpgan+codeformer. When
+        `upscale > 1` the shared Real-ESRGAN `upscaler` is wrapped as GFPGAN's
+        background upsampler, so the general model only touches the background
+        and the restored faces are pasted onto the upscaled canvas."""
+        if self._gfpgan_off:
+            return None
+        cached = self._gfpgan.get(upscale)
+        if cached is not None:
+            return cached
         weights = self.weights_dir / "GFPGANv1.4.pth"
         if not weights.exists():
             # Transient — retry if the weight is added later (no restart needed).
@@ -81,22 +118,25 @@ class FaceRestorer:
             self._gfpgan_off = True  # permanent for this process
             return None
 
-        # arch/channel_multiplier match the v1.4 "clean" model. upscale=1 because
-        # the pipeline's upscale stage handles resolution; here we only restore
-        # faces in-place. bg_upsampler=None leaves the background untouched.
-        #
+        # arch/channel_multiplier match the v1.4 "clean" model.
         # On first run, facexlib downloads its face detection + parsing weights
         # (detection_Resnet50_Final.pth, parsing_parsenet.pth).
+        bg = (
+            _BgUpsamplerAdapter(upscaler)
+            if upscale > 1 and upscaler is not None
+            else None
+        )
         try:
-            self._gfpgan = GFPGANer(
+            model = GFPGANer(
                 model_path=str(weights),
-                upscale=1,
+                upscale=upscale,
                 arch="clean",
                 channel_multiplier=2,
-                bg_upsampler=None,
+                bg_upsampler=bg,
                 device=self._resolve_device(),
             )
-            return self._gfpgan
+            self._gfpgan[upscale] = model
+            return model
         except Exception as exc:  # noqa: BLE001 - bad checkpoint / arch mismatch
             log.warning("GFPGAN load failed (%r); GFPGAN disabled", exc)
             self._gfpgan_off = True  # permanent for this process
@@ -147,20 +187,49 @@ class FaceRestorer:
         # case it still returns the original-shaped image, but guard anyway.
         return restored if restored is not None else img
 
-    def __call__(self, img: np.ndarray, fidelity: float) -> np.ndarray:
+    def __call__(
+        self,
+        img: np.ndarray,
+        fidelity: float,
+        factor: int = 1,
+        upscaler=None,
+    ) -> np.ndarray:
+        """Restore faces, optionally upscaling in the same pass.
+
+        `factor > 1` together with `upscaler` runs the combined face+upscale
+        path: the background is upscaled and the restored faces are pasted onto
+        it (see the module docstring). Otherwise it's an in-place restore at the
+        source resolution."""
         if self._disabled:
             return img
 
+        # An effective upscale is owed only when both a factor and an upscaler
+        # are supplied (the orchestrator's combined stage). Otherwise upscale=1.
+        upscale = factor if factor > 1 and upscaler is not None else 1
+
         out = img
-        # GFPGAN first (structure/symmetry). It ignores fidelity.
+        # GFPGAN first (structure/symmetry). It ignores fidelity. Standalone it
+        # owns the upscale (bg upsampler + paste); in combo it runs in-place
+        # (upscale=1) and CodeFormer owns the final upscale+paste.
         if self.backend in _USES_GFPGAN:
-            model = self._get_gfpgan()
+            gf_upscale = upscale if self.backend == "gfpgan" else 1
+            model = self._get_gfpgan(gf_upscale, upscaler)
             if model is not None:
                 out = self._run_gfpgan(model, out)
-        # CodeFormer second. In combo mode this is the texture pass over GFPGAN's
-        # output; `fidelity` is its w knob.
+            elif self.backend == "gfpgan" and upscale > 1:
+                # GFPGAN unavailable but an upscale is still owed: plain upscale.
+                out = upscaler(out, upscale)
+        # CodeFormer second. In codeformer / combo modes it owns the upscale:
+        # the background is upscaled and the restored 512 crops are pasted onto
+        # that canvas, so the general model never touches the faces. In combo
+        # mode this is also the texture pass over GFPGAN's output; `fidelity` is
+        # its w knob.
         if self.backend in _USES_CODEFORMER:
             model = self._get_codeformer()
             if model is not None:
-                out = model.restore(out, fidelity)
+                bg = upscaler(out, upscale) if upscale > 1 else None
+                out = model.restore(out, fidelity, upscale, bg)
+            elif upscale > 1:
+                # CodeFormer unavailable but an upscale is still owed.
+                out = upscaler(out, upscale)
         return out

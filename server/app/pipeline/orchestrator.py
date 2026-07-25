@@ -1,15 +1,19 @@
 """Runs the selected enhancement stages in a sensible fixed order.
 
-Order: denoise -> colorize -> face_restore -> upscale.
+Order: denoise -> colorize -> (face_restore + upscale).
   - denoise first: it removes sensor noise on the original-resolution image so
     the later stages — colorize, face detection, and the upscaler especially —
     don't amplify it. It's tiled, so VRAM stays bounded on large sources;
   - colorize next gives the later stages real color to work with (DDColor runs
     at a fixed 512px internally, so its VRAM is independent of source size);
-  - face_restore second runs face *detection* on the original-resolution image.
-    Doing it after a 4x upscale meant detecting faces on a ~300MP image, which
-    OOMs the GPU. GFPGAN restores faces in-place; the final upscale sharpens them.
-  - upscale last, and it's tiled, so VRAM stays bounded even for large outputs.
+  - face_restore + upscale: when both are requested they run as ONE stage. Faces
+    are detected/aligned on the original-resolution image (cheap, and it avoids
+    detecting on a ~300MP post-upscale image, which OOMs the GPU), the background
+    is upscaled by Real-ESRGAN, and the restored 512px face crops are pasted onto
+    that upscaled canvas last. This keeps the *general* upscaler off the face
+    pixels — running it over faces turns them waxy/"un-human". If only one of the
+    two is requested it runs on its own (face restore in-place, or a plain
+    upscale). Both are tiled, so VRAM stays bounded even for large outputs.
 
 All stages exchange BGR uint8 ndarrays (OpenCV convention). A single GPU
 semaphore is held for the whole pipeline so concurrent jobs don't OOM the card,
@@ -90,10 +94,16 @@ class Pipeline:
                 f"image too large ({w}x{h} > {self.settings.max_image_pixels}px)"
             )
 
+        # When both are requested, face restoration and upscaling run as one
+        # combined stage (faces pasted onto the upscaled background last, so the
+        # general upscaler never touches face pixels). The standalone
+        # face_restore stage is dropped in that case; the "upscale" stage does
+        # both.
+        combine = ops.face_restore and ops.upscale
         stages = [s for s, on in (
             ("denoise", ops.denoise),
             ("colorize", ops.colorize),
-            ("face_restore", ops.face_restore),
+            ("face_restore", ops.face_restore and not combine),
             ("upscale", ops.upscale),
         ) if on]
         if not stages:
@@ -117,7 +127,14 @@ class Pipeline:
                         f"Upscale capped to ×{eff} (source {sw}×{sh}; ×{ops.upscale_factor} "
                         f"would exceed the {self.settings.max_output_pixels:,}px output limit)."
                     )
-                img = self.upscaler(img, ops.upscale_factor)
+                if combine:
+                    # Restore faces and upscale in one pass: the background is
+                    # upscaled and the restored faces are pasted on top of it.
+                    # Pass the clamped factor so the paste matches the note above
+                    # (eff <= 1 degrades to an in-place restore, no upscale).
+                    img = self.face(img, ops.face_fidelity, eff, self.upscaler)
+                else:
+                    img = self.upscaler(img, ops.upscale_factor)
             log.info("stage %s done -> %s", stage, img.shape)
             self._free_gpu_cache()
 

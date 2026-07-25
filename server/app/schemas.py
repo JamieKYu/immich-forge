@@ -16,9 +16,12 @@ class JobStatus(str, Enum):
 class ForgeOperations(BaseModel):
     """Which enhancement stages to run, and their parameters.
 
-    Stages run in a fixed sensible order: denoise -> colorize -> face_restore
-    -> upscale. Denoise is first so later stages (and the upscaler especially)
-    don't amplify sensor noise.
+    Stages run in a fixed sensible order: denoise -> colorize ->
+    (face_restore + upscale). Denoise is first so later stages (and the
+    upscaler especially) don't amplify sensor noise. When both face_restore and
+    upscale are on they run as one stage: the background is upscaled and the
+    restored faces are pasted onto it last, so the general upscaler never runs
+    over face pixels (which turns them waxy/"un-human").
     """
 
     # Denoise / low-light. Runs first. `denoise_strength` blends the denoised
@@ -37,10 +40,13 @@ class ForgeOperations(BaseModel):
 
     face_restore: bool = False
     # CodeFormer fidelity<->quality knob (0 = max quality, 1 = max fidelity).
-    # Default leans strongly toward fidelity: lower values hallucinate facial
-    # detail (esp. eyes) from the prior; 0.85 keeps features close to the
-    # original while still cleaning up the face.
-    face_fidelity: float = Field(0.85, ge=0.0, le=1.0)
+    # Default leans strongly toward fidelity: lower values let CodeFormer
+    # regenerate facial detail from its codebook prior, and the two eyes can be
+    # reinvented independently (mismatched iris colour/shape). 0.95 keeps the
+    # output anchored to the real input face — both eyes track the source — while
+    # still cleaning it up. Drop it toward 0.5 only for heavily damaged photos
+    # that need more aggressive reconstruction.
+    face_fidelity: float = Field(0.95, ge=0.0, le=1.0)
 
 
 class ForgeRequest(BaseModel):
