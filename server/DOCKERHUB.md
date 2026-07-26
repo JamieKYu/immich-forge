@@ -20,7 +20,17 @@ In the Immich web app: click your **avatar (top‑right) → Account Settings �
 
 Also note your Immich URL. For a typical self‑hosted setup it's `http://YOUR_SERVER_IP:2283`.
 
-## 2. Run the server
+## 2. Create your Forge API token (required)
+
+Generate a token and **save it somewhere safe** — you'll pass it to the server in the next step and enter the *exact same value* in the extension:
+
+```bash
+openssl rand -hex 32
+```
+
+Copy the output; that string is your `FORGE_API_TOKEN`.
+
+## 3. Run the server
 
 ```bash
 docker run -d \
@@ -29,14 +39,14 @@ docker run -d \
   -p 8000:8000 \
   -e IMMICH_BASE_URL=http://YOUR_SERVER_IP:2283 \
   -e IMMICH_API_KEY=paste-your-immich-api-key \
-  -e FORGE_API_TOKEN=$(openssl rand -hex 32) \
+  -e FORGE_API_TOKEN=paste-the-token-you-saved \
   -v immich-forge-weights:/app/weights \
   --restart unless-stopped \
   jamiekyu/immich-forge:latest
 ```
 
 - `IMMICH_BASE_URL` / `IMMICH_API_KEY` — point Forge at your Immich and let it act on your behalf.
-- `FORGE_API_TOKEN` — **required**; a secret that protects this server (anyone who can reach it could otherwise use your GPU and read your Immich library). The command above generates a random one; **set your own and save it** — you'll enter it in the extension. If it's unset the server fails closed (HTTP 503).
+- `FORGE_API_TOKEN` — **required.** Paste the token you generated in step 2.
 - `-v immich-forge-weights:/app/weights` — model weights (~2–3 GB) download here on first start. Keep this volume so they aren't re‑downloaded.
 
 Check it's healthy:
@@ -48,7 +58,7 @@ curl http://YOUR_SERVER_IP:8000/health
 
 > First boot downloads the model weights, so give it a minute before the GPU stages work. Until they're present, Forge falls back to basic (non‑AI) processing.
 
-## 3. Install the Chrome extension
+## 4. Install the Chrome extension
 
 Install **“Forge for Immich”** from the **Chrome Web Store**:
 https://chromewebstore.google.com/detail/forge-for-immich/ceaoooljelkcaagcljambkdldadpblgc
@@ -56,7 +66,7 @@ https://chromewebstore.google.com/detail/forge-for-immich/ceaoooljelkcaagcljambk
 Then open a single photo in your Immich web app, click the **Forge** toolbar icon, open **settings**, and enter:
 
 - **Forge server URL** — `http://YOUR_SERVER_IP:8000`
-- **Forge API token** — the `FORGE_API_TOKEN` value from step 2
+- **Forge API token** — the **exact** `FORGE_API_TOKEN` from step 2
 
 ---
 
@@ -77,7 +87,7 @@ Then open a single photo in your Immich web app, click the **Forge** toolbar ico
 | `FORGE_MAX_CONCURRENT_GPU_JOBS` | `1` | Simultaneous GPU jobs. |
 | `FORGE_JOB_TTL_SECONDS` | `3600` | How long finished results are kept. |
 
-The server listens on **port 8000**. `/health` is public; all other endpoints require the `FORGE_API_TOKEN` bearer token when one is set.
+The server listens on **port 8000**. `/health` is public; every other endpoint requires the `FORGE_API_TOKEN` bearer token, and the server fails closed with **HTTP 503** until one is set.
 
 ## Image tags
 
@@ -126,7 +136,7 @@ docker run -d --name immich-forge -p 8000:8000 \
   -e FORGE_DEVICE=cpu \
   -e IMMICH_BASE_URL=http://YOUR_SERVER_IP:2283 \
   -e IMMICH_API_KEY=paste-your-immich-api-key \
-  -e FORGE_API_TOKEN=$(openssl rand -hex 32) \
+  -e FORGE_API_TOKEN=paste-the-token-you-saved \
   -v immich-forge-weights:/app/weights \
   jamiekyu/immich-forge:latest
 ```
