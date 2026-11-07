@@ -56,8 +56,9 @@ jobs:
           cache: pip
 
       # Core deps + test deps only. The heavy ML/GPU stack (requirements-ml.txt:
-      # torch/basicsr/realesrgan/gfpgan) is NOT installed — every tested code path
-      # runs on the classical-CV fallbacks, so CI stays fast and GPU-free.
+      # torch/spandrel/basicsr/gfpgan) is NOT installed — tested code paths run on
+      # the classical-CV fallbacks, and the tests that need torch/spandrel
+      # (test_upscale_spandrel.py) skip themselves, so CI stays fast and GPU-free.
       - name: Install dependencies
         working-directory: server
         run: |
