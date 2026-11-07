@@ -92,7 +92,7 @@ and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS
 | Stage | Backend | Source |
 |-------|---------|--------|
 | denoise | SCUNet (`scunet` \| `nlm` \| `none`) | **vendored** under `app/pipeline/scunet/` + `scunet_color_real_psnr.pth` |
-| upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `realesrgan` + `RealESRGAN_x4plus.pth` |
+| upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `spandrel` + `RealESRGAN_x4plus.pth` |
 | face restore | CodeFormer (`codeformer` \| `gfpgan` \| `gfpgan+codeformer` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or pip `gfpgan` + `GFPGANv1.4.pth` |
 | colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
 

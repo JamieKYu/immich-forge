@@ -5,15 +5,17 @@
 # others. If you hit resolver conflicts, run colorization in its own container
 # and keep this file for upscale + face restore only.
 
-# Real-ESRGAN upscaling
-realesrgan==0.3.0
+# Real-ESRGAN upscaling — the RealESRGAN_x4plus.pth checkpoint is loaded via
+# spandrel (architecture auto-detected from the weights; no basicsr import).
+spandrel==0.4.2
+# basicsr is still required by gfpgan below (hence the Dockerfile patches).
 basicsr==1.4.2
 
 # Face restoration.
 #  - gfpgan: default backend, drives GFPGANv1.4 end-to-end.
 #  - CodeFormer is vendored under app/pipeline/codeformer/ (like scunet/ddcolor)
 #    and driven directly via facexlib (detection/align/paste-back) + basicsr
-#    (img<->tensor helpers); basicsr is already pulled in by Real-ESRGAN above.
+#    (img<->tensor helpers); basicsr is pinned above.
 gfpgan==1.3.8
 facexlib==0.3.0
 

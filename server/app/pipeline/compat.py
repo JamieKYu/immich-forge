@@ -1,12 +1,12 @@
 """Compatibility shims for the deep-learning model libs.
 
-`basicsr` (a transitive dep of GFPGAN/CodeFormer/Real-ESRGAN) does:
+`basicsr` (a transitive dep of GFPGAN) does:
 
     from torchvision.transforms.functional_tensor import rgb_to_grayscale
 
 but `functional_tensor` was removed in torchvision 0.17. Rather than pin Torch
 back several minor versions, alias the one symbol basicsr needs onto the current
-`functional` module. Must run BEFORE importing basicsr/gfpgan/realesrgan.
+`functional` module. Must run BEFORE importing basicsr/gfpgan.
 """
 from __future__ import annotations
 

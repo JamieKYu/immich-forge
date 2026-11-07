@@ -1,5 +1,5 @@
 # Test-only dependencies. Layered on top of requirements.txt (core runtime).
-# The ML stack (requirements-ml.txt: torch/basicsr/realesrgan/gfpgan) is NOT
+# The ML stack (requirements-ml.txt: torch/spandrel/basicsr/gfpgan) is NOT
 # needed — the code paths under test all run on the classical-CV fallbacks, so
 # CI stays GPU-free and fast.
 pytest==8.3.4
