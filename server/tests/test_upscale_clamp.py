@@ -1,6 +1,6 @@
 """Tests for the upscale clamp math and OOM detection — pure logic, no GPU.
 
-The Upscaler is constructed with a non-realesrgan backend so it stays in its
+The Upscaler is constructed with the lanczos backend so it stays in its
 permanently-disabled (classical) state and never touches torch.
 """
 from __future__ import annotations
@@ -62,12 +62,8 @@ def test_requested_factor_two_not_raised():
     assert up.effective_factor(_img(500, 500), 2) == 2
 
 
-def test_looks_like_oom_detects_direct_and_disguised():
+def test_looks_like_oom_detects_by_message_and_type():
     assert _looks_like_oom(RuntimeError("CUDA out of memory. Tried to allocate"))
-    # Real-ESRGAN's tile loop masks the OOM as an UnboundLocalError on output_tile.
-    assert _looks_like_oom(
-        UnboundLocalError("local variable 'output_tile' referenced before assignment")
-    )
 
     class OutOfMemoryError(Exception):
         pass

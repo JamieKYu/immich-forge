@@ -32,10 +32,10 @@ COPY requirements-ml.txt .
 RUN pip install --no-build-isolation -r requirements-ml.txt || \
     echo "WARN: ML deps failed to install; server will use classical fallbacks"
 
-# basicsr 1.4.2 (a dep of realesrgan/gfpgan) imports
+# basicsr 1.4.2 (a dep of gfpgan) imports
 # `torchvision.transforms.functional_tensor`, which was removed in torchvision
-# 0.17+. Rewrite the import in the installed package so `import realesrgan` /
-# gfpgan work in any context (the runtime shim in app/pipeline/compat.py is a
+# 0.17+. Rewrite the import in the installed package so `import gfpgan`
+# works in any context (the runtime shim in app/pipeline/compat.py is a
 # secondary backup for non-Docker runs).
 RUN find /usr/local/lib/python3.11/dist-packages/basicsr -name '*.py' \
       -exec sed -i \
