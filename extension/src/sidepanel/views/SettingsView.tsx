@@ -80,7 +80,7 @@ export function SettingsView({
               checked={operations.low_light}
               onChange={(e) => set({ low_light: e.target.checked })}
             />
-            Brighten low-light (CLAHE + gamma)
+            Brighten low-light
           </label>
         </div>
       )}
