@@ -16,8 +16,7 @@ docker compose up --build
 On first boot the container downloads the model weights into the mounted
 `weights/` volume (idempotent — subsequent starts are instant). Set
 `FORGE_SKIP_WEIGHT_DOWNLOAD=1` to bypass this and pre-populate `weights/`
-yourself (e.g. air-gapped hosts). The `basicsr` `functional_tensor` import is
-patched at build time so Real-ESRGAN / GFPGAN import cleanly.
+yourself (e.g. air-gapped hosts).
 
 ## Run locally without a GPU (fallback mode)
 
@@ -96,13 +95,12 @@ and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS
 | de-JPEG | FBCNN (`fbcnn` \| `none`) | pip `spandrel` + `fbcnn_color.pth` |
 | denoise | SCUNet (`scunet` \| `nlm` \| `none`) | **vendored** under `app/pipeline/scunet/` + `scunet_color_real_psnr.pth` |
 | upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `spandrel` + `RealESRGAN_x4plus.pth` |
-| face restore | CodeFormer (`codeformer` \| `gfpgan` \| `gfpgan+codeformer` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or pip `gfpgan` + `GFPGANv1.4.pth` |
+| face restore | CodeFormer (`codeformer` \| `gfpgan` \| `gfpgan+codeformer` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or `spandrel` + `GFPGANv1.4.pth`; pip `facexlib` for detection/paste-back |
 | colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
 | low-light | HVI-CIDNet (`hvicidnet` \| `classical`) | pip `spandrel` + `hvi_cidnet_generalization.safetensors` |
 
-DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
-`basicsr`/`timm` dependency, so it doesn't collide with the `basicsr` Real-ESRGAN
-uses. DeOldify was the original plan but needs fastai 1.x / torch 1.x, which is
+DDColor (ICCV 2023) is vendored as a self-contained torch implementation, with
+no `basicsr`/`timm` dependency. DeOldify was the original plan but needs fastai 1.x / torch 1.x, which is
 incompatible with the torch 2.x this image runs on.
 
 SCUNet (Swin-Conv-UNet) is vendored the same way — torch + `einops` only, with
@@ -131,15 +129,18 @@ stay on the 8×8 JPEG block grid. Without the weights it's a logged no-op
 (`FORGE_DEJPEG_BACKEND=fbcnn|none`).
 
 CodeFormer (default face backend) is vendored the same way — the arch is copied
-from sczhou/CodeFormer with the `basicsr` registry decorators stripped, and it's
-driven via `facexlib` (detection/align/paste-back) + `basicsr` img helpers. It's
-the default because it's the only face backend that honors `face_fidelity` (its
+from sczhou/CodeFormer with the `basicsr` registry decorators stripped. Every
+face backend shares one `facexlib` flow (`app/pipeline/faces.py`): detect,
+align each face to a 512px crop, restore the crop, paste it back through a
+face-parsing mask. GFPGAN's network is loaded via `spandrel`; neither `gfpgan`
+nor `basicsr` is installed. CodeFormer is the default because it's the only face backend that honors `face_fidelity` (its
 `w` knob: 0 = max quality/most restored, 1 = closest to the original face).
 GFPGAN has no such control and ignores `face_fidelity` entirely.
 
-`gfpgan+codeformer` runs both in sequence — GFPGAN first (it's good at fixing
-eye positioning / facial symmetry but leaves a smooth "plastic" skin), then
-CodeFormer over that result to add realistic skin texture back. `face_fidelity`
+`gfpgan+codeformer` runs both on each aligned face crop before a single
+paste-back — GFPGAN first (it's good at fixing eye positioning / facial symmetry
+but leaves a smooth "plastic" skin), then CodeFormer over that result to add
+realistic skin texture back. `face_fidelity`
 drives the CodeFormer pass here, so set it **low** (~0.3-0.5) to let the prior
 add texture. If either weight is absent the stage degrades to whichever loaded.
 

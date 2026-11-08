@@ -1,14 +1,14 @@
-"""Tests for the FaceRestorer stage's no-op behavior. These stay off the deep
-models — they never import torch/gfpgan/basicsr — by exercising only the paths
-that short-circuit before a load:
+"""Tests for the FaceRestorer stage's wiring and no-op behavior — no torch,
+facexlib or model weights:
 
   * backend="none" is permanently disabled (returns the input untouched);
-  * backend="codeformer"/"gfpgan" with a missing weight no-op (the
-    weight-existence check short-circuits before importing the ML stack).
+  * a missing weight no-ops (the weight-existence check short-circuits before
+    importing the ML stack), while still honouring an owed upscale;
+  * with the models and the face pipeline stubbed out: which models run per
+    backend, in what order, with what fidelity, and what reaches paste-back.
 
-The actual restoration + fidelity behavior needs the model weights and the ML
-deps, which CI intentionally omits (GPU-free); that path is covered by loading
-the real codeformer.pth into the vendored arch during development.
+Real restoration needs the weights and the ML stack (which CI omits); the
+crop <-> tensor conversion is covered by test_faces.py.
 """
 from __future__ import annotations
 
@@ -81,3 +81,86 @@ def test_factor_without_upscaler_is_plain_restore():
     img = _img()
     out = _restorer("codeformer")(img, fidelity=0.5, factor=4)
     assert np.array_equal(out, img)
+
+
+class _Crop:
+    """Stands in for an aligned-crop tensor; records which models touched it."""
+
+    def __init__(self, trail=()):
+        self.trail = list(trail)
+
+    def clamp(self, lo, hi):
+        return self
+
+
+class _FakeFaces:
+    """Stands in for FacePipeline: runs restore_crop once, records the call."""
+
+    def __init__(self):
+        self.calls = []
+        self.trail = None
+
+    def restore(self, img, restore_crop, factor, bg):
+        self.calls.append((factor, None if bg is None else bg.shape))
+        self.trail = restore_crop(_Crop()).trail
+        return bg if bg is not None else img
+
+
+def _stubbed(backend: str, gfpgan: bool = True, codeformer: bool = True):
+    r = _restorer(backend)
+    faces, seen = _FakeFaces(), {}
+
+    def fake_gfpgan(t, return_rgb):
+        assert return_rgb is False
+        return (_Crop(t.trail + ["gfpgan"]),)
+
+    def fake_codeformer(t, w, adain):
+        seen["w"] = w
+        return (_Crop(t.trail + ["codeformer"]),)
+
+    r._get_faces = lambda: faces
+    r._get_gfpgan = lambda: fake_gfpgan if gfpgan else None
+    r._get_codeformer = lambda: fake_codeformer if codeformer else None
+    return r, faces, seen
+
+
+def test_each_backend_runs_only_its_models():
+    for backend, trail in (
+        ("gfpgan", ["gfpgan"]),
+        ("codeformer", ["codeformer"]),
+        ("gfpgan+codeformer", ["gfpgan", "codeformer"]),
+    ):
+        r, faces, _ = _stubbed(backend)
+        r(_img(), fidelity=0.5)
+        assert faces.trail == trail, backend
+        assert len(faces.calls) == 1, backend  # one detect/paste pass, even for the combo
+
+
+def test_fidelity_is_codeformers_w():
+    r, _, seen = _stubbed("gfpgan+codeformer")
+    r(_img(), fidelity=0.3)
+    assert seen["w"] == 0.3
+
+
+def test_combo_degrades_to_whichever_model_loaded():
+    r, faces, _ = _stubbed("gfpgan+codeformer", gfpgan=False)
+    r(_img(), fidelity=0.5)
+    assert faces.trail == ["codeformer"]
+    r, faces, _ = _stubbed("gfpgan+codeformer", codeformer=False)
+    r(_img(), fidelity=0.5)
+    assert faces.trail == ["gfpgan"]
+
+
+def test_combined_upscale_pastes_onto_upscaled_background():
+    img = _img(h=10, w=10)
+    calls = []
+
+    def fake_upscaler(im, factor):
+        calls.append(factor)
+        return np.repeat(np.repeat(im, factor, axis=0), factor, axis=1)
+
+    r, faces, _ = _stubbed("codeformer")
+    out = r(img, fidelity=0.5, factor=2, upscaler=fake_upscaler)
+    assert calls == [2]  # the background is upscaled exactly once
+    assert faces.calls == [(2, (20, 20, 3))]  # faces pasted at x2 onto it
+    assert out.shape == (20, 20, 3)

@@ -1,9 +1,9 @@
 """Colorization stage.
 
 Wired backend: **DDColor** (ICCV 2023), vendored under `ddcolor/` — a
-self-contained torch implementation (no basicsr/timm dependency, so it doesn't
-collide with the basicsr used by Real-ESRGAN). When the model/weights are
-unavailable this stage is a logged no-op (it only ensures a 3-channel output).
+self-contained torch implementation (no basicsr/timm dependency). When the
+model/weights are unavailable this stage is a logged no-op (it only ensures a
+3-channel output).
 """
 from __future__ import annotations
 
