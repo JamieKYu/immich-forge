@@ -26,9 +26,9 @@ class ForgeOperations(BaseModel):
 
     # Denoise / low-light. Runs first. `denoise_strength` blends the denoised
     # result back toward the original (1 = fully denoised, 0 = original) so the
-    # model's smoothing can be dialled down. `low_light` adds a classical
-    # CLAHE + gamma brightening pass (SCUNet/NAFNet only denoise, they don't
-    # brighten), applied after denoising.
+    # model's smoothing can be dialled down. `low_light` brightens with
+    # HVI-CIDNet (classical CLAHE + gamma fallback) *before* denoising, so the
+    # denoiser also cleans up the noise brightening exposes.
     denoise: bool = False
     denoise_strength: float = Field(1.0, ge=0.0, le=1.0)
     low_light: bool = False

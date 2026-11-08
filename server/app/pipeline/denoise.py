@@ -8,9 +8,10 @@ degrades to `nlm` rather than a no-op. `backend="nlm"` forces that path; `"none"
 disables denoising entirely (low-light can still run).
 
 `strength` blends the denoised result back toward the original (1 = fully
-denoised, 0 = original) to dial down over-smoothing. `low_light` applies a
-classical CLAHE + gamma brightening pass *after* denoising — the deep denoisers
-clean noise but don't brighten, so low-light is handled with classical CV.
+denoised, 0 = original) to dial down over-smoothing. `low_light` brightens the
+image *before* denoising (see `low_light.py` for why) — HVI-CIDNet by default,
+classical CLAHE + gamma as the fallback — so the blend is toward the
+brightened image, and the denoiser cleans up the noise brightening exposes.
 
 All I/O is BGR uint8 (the pipeline convention).
 """
@@ -22,11 +23,16 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .low_light import LowLightEnhancer
+
 log = logging.getLogger("forge.denoise")
 
 
 class Denoiser:
-    def __init__(self, backend: str, weights_dir: Path, device: str, tile: int = 512):
+    def __init__(
+        self, backend: str, weights_dir: Path, device: str, tile: int = 512,
+        low_light: LowLightEnhancer | None = None,
+    ):
         self.backend = backend
         self.weights_dir = weights_dir
         self.device = device
@@ -36,6 +42,7 @@ class Denoiser:
         self._use_nlm = backend == "nlm"         # classical path (forced or fallen-back)
         self._scunet_failed = False              # permanent SCUNet load/run failure
         self._warned_missing = False             # warn once, not every call
+        self._low_light = low_light or LowLightEnhancer("classical", weights_dir, device)
 
     def _load_scunet(self):
         """Build the SCUNet pipeline. Returns None if it can't (yet)."""
@@ -86,33 +93,17 @@ class Denoiser:
     def __call__(
         self, img: np.ndarray, strength: float = 1.0, low_light: bool = False
     ) -> np.ndarray:
+        if low_light:
+            img = self._low_light(img)
         out = img
         if not self._disabled:
             denoised = self._denoise(img)
-            # Blend back toward the original to soften the effect. strength>=1
-            # keeps the full denoise; <=0 keeps the original.
+            # Blend back toward the (possibly brightened) input to soften the
+            # effect. strength>=1 keeps the full denoise; <=0 keeps the input.
             if strength >= 1.0:
                 out = denoised
             elif strength <= 0.0:
                 out = img
             else:
                 out = cv2.addWeighted(denoised, strength, img, 1.0 - strength, 0.0)
-        if low_light:
-            out = self._enhance_low_light(out)
         return out
-
-    @staticmethod
-    def _enhance_low_light(img: np.ndarray) -> np.ndarray:
-        """Classical low-light lift: CLAHE on the LAB L-channel for local
-        contrast, then a brightening gamma. Cheap, deterministic, no model."""
-        lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-        l, a, b = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        l = clahe.apply(l)
-        out = cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2BGR)
-
-        gamma = 0.7  # <1 brightens midtones/shadows
-        lut = np.array(
-            [((i / 255.0) ** gamma) * 255 for i in range(256)], dtype=np.uint8
-        )
-        return cv2.LUT(out, lut)

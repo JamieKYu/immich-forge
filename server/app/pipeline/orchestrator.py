@@ -33,6 +33,7 @@ from ..schemas import ForgeOperations
 from .colorize import Colorizer
 from .denoise import Denoiser
 from .face_restore import FaceRestorer
+from .low_light import LowLightEnhancer
 from .upscale import Upscaler
 
 log = logging.getLogger("forge.pipeline")
@@ -56,6 +57,10 @@ class Pipeline:
         )
         self.denoiser = Denoiser(
             settings.denoise_backend, settings.weights_dir, settings.device, tile,
+            low_light=LowLightEnhancer(
+                settings.low_light_backend, settings.weights_dir, settings.device,
+                settings.low_light_max_pixels,
+            ),
         )
         # Serialize GPU access across jobs.
         self._gpu = asyncio.Semaphore(settings.max_concurrent_gpu_jobs)

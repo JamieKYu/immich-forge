@@ -106,6 +106,7 @@ async def models(request: Request, _: None = Depends(require_token)):
         "upscale": s.upscale_backend,
         "face": s.face_backend,
         "colorize": s.colorize_backend,
+        "low_light": s.low_light_backend,
     }
 
 
