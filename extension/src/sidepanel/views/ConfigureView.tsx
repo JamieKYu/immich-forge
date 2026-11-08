@@ -19,12 +19,13 @@ export function ConfigureView({
   const [error, setError] = useState<string | null>(null)
   const [lowQuality, setLowQuality] = useState(false)
 
+  // Same order as the settings page (not the server's pipeline order).
   const summary = [
-    operations.dejpeg && 'JPEG cleanup',
-    operations.denoise && (operations.low_light ? 'denoise + low-light' : 'denoise'),
-    operations.colorize && 'colorize',
     operations.upscale && `upscale ×${operations.upscale_factor}`,
     operations.face_restore && 'face restore',
+    operations.denoise && (operations.low_light ? 'denoise + low-light' : 'denoise'),
+    operations.colorize && 'colorize',
+    operations.dejpeg && 'JPEG cleanup',
   ]
     .filter(Boolean)
     .join(' · ')
