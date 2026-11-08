@@ -228,7 +228,6 @@ function PhotoForge({
       <ReviewView
         client={client}
         initialJob={job}
-        operations={operations}
         onReforge={() => setJob(null)}
         onDone={() => setJob(null)}
       />
