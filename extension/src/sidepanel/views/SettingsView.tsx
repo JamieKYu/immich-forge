@@ -56,6 +56,11 @@ export function SettingsView({
       <label style={{ marginTop: 16 }}>Default enhancements</label>
 
       <div className="setting">
+        <span>Remove JPEG artifacts</span>
+        <Switch checked={operations.dejpeg} onChange={(v) => set({ dejpeg: v })} />
+      </div>
+
+      <div className="setting">
         <span>Denoise &amp; low-light</span>
         <Switch checked={operations.denoise} onChange={(v) => set({ denoise: v })} />
       </div>

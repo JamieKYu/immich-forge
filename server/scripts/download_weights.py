@@ -13,6 +13,8 @@ import urllib.request
 from pathlib import Path
 
 WEIGHTS = {
+    # FBCNN blind JPEG artifact removal (colour model, Apache-2.0, ~288MB).
+    "fbcnn_color.pth": "https://github.com/jiaxi-jiang/FBCNN/releases/download/v1.0/fbcnn_color.pth",
     # SCUNet blind real-image denoising (colour PSNR model).
     "scunet_color_real_psnr.pth": "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth",
     # HVI-CIDNet low-light enhancement ("Generalization" weights, MIT, ~8MB).

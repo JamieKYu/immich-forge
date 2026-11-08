@@ -102,6 +102,7 @@ async def health(request: Request):
 async def models(request: Request, _: None = Depends(require_token)):
     s = request.app.state.settings
     return {
+        "dejpeg": s.dejpeg_backend,
         "denoise": s.denoise_backend,
         "upscale": s.upscale_backend,
         "face": s.face_backend,

@@ -16,19 +16,24 @@ class JobStatus(str, Enum):
 class ForgeOperations(BaseModel):
     """Which enhancement stages to run, and their parameters.
 
-    Stages run in a fixed sensible order: denoise -> colorize ->
-    (face_restore + upscale). Denoise is first so later stages (and the
-    upscaler especially) don't amplify sensor noise. When both face_restore and
+    Stages run in a fixed sensible order: dejpeg -> denoise -> colorize ->
+    (face_restore + upscale). De-JPEG and denoise come first so later stages
+    (and the upscaler especially) don't amplify compression artifacts or
+    sensor noise. When both face_restore and
     upscale are on they run as one stage: the background is upscaled and the
     restored faces are pasted onto it last, so the general upscaler never runs
     over face pixels (which turns them waxy/"un-human").
     """
 
-    # Denoise / low-light. Runs first. `denoise_strength` blends the denoised
-    # result back toward the original (1 = fully denoised, 0 = original) so the
-    # model's smoothing can be dialled down. `low_light` brightens with
-    # HVI-CIDNet (classical CLAHE + gamma fallback) *before* denoising, so the
-    # denoiser also cleans up the noise brightening exposes.
+    # JPEG artifact removal (FBCNN, blind — it estimates the JPEG quality
+    # itself). Opt-in: it lightly smooths an already-clean image. Runs first.
+    dejpeg: bool = False
+
+    # Denoise / low-light. Runs after de-JPEG. `denoise_strength` blends the
+    # denoised result back toward the original (1 = fully denoised, 0 =
+    # original) so the model's smoothing can be dialled down. `low_light`
+    # brightens with HVI-CIDNet (classical CLAHE + gamma fallback) *before*
+    # denoising, so the denoiser also cleans up the noise brightening exposes.
     denoise: bool = False
     denoise_strength: float = Field(1.0, ge=0.0, le=1.0)
     low_light: bool = False

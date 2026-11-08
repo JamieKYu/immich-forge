@@ -1,7 +1,9 @@
 """Runs the selected enhancement stages in a sensible fixed order.
 
-Order: denoise -> colorize -> (face_restore + upscale).
-  - denoise first: it removes sensor noise on the original-resolution image so
+Order: dejpeg -> denoise -> colorize -> (face_restore + upscale).
+  - dejpeg first (opt-in): JPEG blocking/ringing is part of the source as
+    stored, so it's removed before anything brightens, smooths or enlarges it;
+  - denoise next: it removes sensor noise on the original-resolution image so
     the later stages — colorize, face detection, and the upscaler especially —
     don't amplify it. It's tiled, so VRAM stays bounded on large sources;
   - colorize next gives the later stages real color to work with (DDColor runs
@@ -31,6 +33,7 @@ import numpy as np
 from ..config import Settings
 from ..schemas import ForgeOperations
 from .colorize import Colorizer
+from .dejpeg import JpegCleaner
 from .denoise import Denoiser
 from .face_restore import FaceRestorer
 from .low_light import LowLightEnhancer
@@ -54,6 +57,9 @@ class Pipeline:
         )
         self.colorizer = Colorizer(
             settings.colorize_backend, settings.weights_dir, settings.device
+        )
+        self.dejpeg = JpegCleaner(
+            settings.dejpeg_backend, settings.weights_dir, settings.device, tile,
         )
         self.denoiser = Denoiser(
             settings.denoise_backend, settings.weights_dir, settings.device, tile,
@@ -106,6 +112,7 @@ class Pipeline:
         # both.
         combine = ops.face_restore and ops.upscale
         stages = [s for s, on in (
+            ("dejpeg", ops.dejpeg),
             ("denoise", ops.denoise),
             ("colorize", ops.colorize),
             ("face_restore", ops.face_restore and not combine),
@@ -118,7 +125,9 @@ class Pipeline:
         progress(0.0, "starting")
         for i, stage in enumerate(stages):
             progress(i / len(stages), stage)
-            if stage == "denoise":
+            if stage == "dejpeg":
+                img = self.dejpeg(img)
+            elif stage == "denoise":
                 img = self.denoiser(img, ops.denoise_strength, ops.low_light)
             elif stage == "colorize":
                 img = self.colorizer(img)

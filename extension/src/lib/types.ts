@@ -1,6 +1,7 @@
 // Mirrors the Forge server's Pydantic schemas.
 
 export interface ForgeOperations {
+  dejpeg: boolean // FBCNN JPEG artifact removal; runs first
   denoise: boolean
   denoise_strength: number // 0..1 (blend denoised result toward original)
   low_light: boolean // HVI-CIDNet brighten (CLAHE fallback), before denoise
@@ -52,6 +53,7 @@ export interface Settings {
 }
 
 export const DEFAULT_OPERATIONS: ForgeOperations = {
+  dejpeg: false,
   denoise: false,
   denoise_strength: 1,
   low_light: false,

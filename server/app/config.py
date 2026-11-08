@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Backend selection per stage. Each falls back to a classical-CV impl
     # when the deep model / weights are unavailable.
+    dejpeg_backend: str = Field("fbcnn", alias="FORGE_DEJPEG_BACKEND")         # fbcnn|none
     denoise_backend: str = Field("scunet", alias="FORGE_DENOISE_BACKEND")      # scunet|nlm|none
     upscale_backend: str = Field("realesrgan", alias="FORGE_UPSCALE_BACKEND")  # realesrgan|lanczos
     # codeformer default: it honours the face_fidelity knob (GFPGAN ignores it).

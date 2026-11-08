@@ -20,6 +20,7 @@ export function ConfigureView({
   const [lowQuality, setLowQuality] = useState(false)
 
   const summary = [
+    operations.dejpeg && 'JPEG cleanup',
     operations.denoise && (operations.low_light ? 'denoise + low-light' : 'denoise'),
     operations.colorize && 'colorize',
     operations.upscale && `upscale ×${operations.upscale_factor}`,
