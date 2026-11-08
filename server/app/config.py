@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # commercial use.
     face_backend: str = Field("codeformer", alias="FORGE_FACE_BACKEND")        # codeformer|gfpgan|gfpgan+codeformer|none
     colorize_backend: str = Field("ddcolor", alias="FORGE_COLORIZE_BACKEND")   # ddcolor|none
+    low_light_backend: str = Field("hvicidnet", alias="FORGE_LOW_LIGHT_BACKEND")  # hvicidnet|classical
+    # HVI-CIDNet runs on the whole image up to this size (~1.35GB VRAM per MP,
+    # so the 4MP default needs ~5.3GB); larger images run on a downscale carried
+    # back to full res. Lower it if low-light OOMs; raise it on a big GPU (e.g.
+    # 12MP on 24GB) for slightly truer brightness on more photos.
+    low_light_max_pixels: int = Field(4_000_000, alias="FORGE_LOW_LIGHT_MAX_PIXELS")
 
     # --- Source-quality precheck (heuristic; see pipeline/quality.py) ---
     # An image is flagged low-quality if it fails ANY bar. Defaults lean

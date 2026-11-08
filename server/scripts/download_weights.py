@@ -15,6 +15,8 @@ from pathlib import Path
 WEIGHTS = {
     # SCUNet blind real-image denoising (colour PSNR model).
     "scunet_color_real_psnr.pth": "https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth",
+    # HVI-CIDNet low-light enhancement ("Generalization" weights, MIT, ~8MB).
+    "hvi_cidnet_generalization.safetensors": "https://huggingface.co/Fediory/HVI-CIDNet-Generalization/resolve/main/model.safetensors",
     # Real-ESRGAN x4 general model.
     "RealESRGAN_x4plus.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
     # GFPGAN v1.4 (used by both GFPGAN and as a face helper for CodeFormer).

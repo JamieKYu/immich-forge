@@ -95,6 +95,7 @@ and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS
 | upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `spandrel` + `RealESRGAN_x4plus.pth` |
 | face restore | CodeFormer (`codeformer` \| `gfpgan` \| `gfpgan+codeformer` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or pip `gfpgan` + `GFPGANv1.4.pth` |
 | colorize | DDColor (`ddcolor` \| `none`) | **vendored** under `app/pipeline/ddcolor/` + `ddcolor_modelscope.pth` |
+| low-light | HVI-CIDNet (`hvicidnet` \| `classical`) | pip `spandrel` + `hvi_cidnet_generalization.safetensors` |
 
 DDColor (ICCV 2023) is vendored as a self-contained torch implementation — no
 `basicsr`/`timm` dependency, so it doesn't collide with the `basicsr` Real-ESRGAN
@@ -105,10 +106,18 @@ SCUNet (Swin-Conv-UNet) is vendored the same way — torch + `einops` only, with
 `timm`'s `trunc_normal_`/`DropPath` inlined. It's a *blind* real-image denoiser,
 so it needs no noise-level input. The denoise stage's classical fallback is a
 real denoiser (OpenCV Non-Local Means), so a missing weight degrades to `nlm`
-rather than a no-op. SCUNet/NAFNet-style models denoise but don't brighten, so
-**low-light enhancement is a classical CLAHE + gamma pass** (`low_light`) applied
-after denoising. `denoise_strength` (0–1) blends the denoised result back toward
-the original to soften over-smoothing.
+rather than a no-op. `denoise_strength` (0–1) blends the denoised result back
+toward the original to soften over-smoothing.
+
+**Low-light** (`low_light`) is **HVI-CIDNet** (CVPR 2025, MIT; the authors'
+"Generalization" weights, loaded via `spandrel`), with classical CLAHE + gamma
+as the fallback (`FORGE_LOW_LIGHT_BACKEND=hvicidnet|classical`). It runs inside
+the denoise stage *before* denoising: on a dark photo the denoiser would smear
+the faint detail into flat patches, whereas HVI-CIDNet handles noisy dark input
+itself and the denoiser then cleans up the noise brightening exposes. The model
+can't be tiled (its attention is global), so above `FORGE_LOW_LIGHT_MAX_PIXELS`
+(default 4MP, ~1.35GB VRAM per MP) it runs on a downscale whose brightness/colour
+is carried back to full resolution with the source's own detail re-added.
 
 CodeFormer (default face backend) is vendored the same way — the arch is copied
 from sczhou/CodeFormer with the `basicsr` registry decorators stripped, and it's

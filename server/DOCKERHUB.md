@@ -84,6 +84,8 @@ Then open a single photo in your Immich web app, click the **Forge** toolbar ico
 | `FORGE_UPSCALE_BACKEND` | `realesrgan` | `realesrgan` or `lanczos`. |
 | `FORGE_FACE_BACKEND` | `codeformer` | `codeformer` (honors Fidelity; non-commercial S-Lab license), `gfpgan` (Apache-2.0; ignores Fidelity), `gfpgan+codeformer` (GFPGAN structure then CodeFormer texture; set Fidelity low ~0.3-0.5), or `none`. |
 | `FORGE_COLORIZE_BACKEND` | `ddcolor` | `ddcolor` or `none`. |
+| `FORGE_LOW_LIGHT_BACKEND` | `hvicidnet` | `hvicidnet` (HVI-CIDNet, MIT) or `classical` (CLAHE + gamma). |
+| `FORGE_LOW_LIGHT_MAX_PIXELS` | `4000000` | Largest image HVI-CIDNet runs on whole (~1.35GB VRAM per MP: 4MP ≈ 5.3GB; ~12MP fits a 24GB card); bigger ones use a downscale carried back to full res. Lower it if low-light hits GPU out‑of‑memory. |
 | `FORGE_MAX_CONCURRENT_GPU_JOBS` | `1` | Simultaneous GPU jobs. |
 | `FORGE_JOB_TTL_SECONDS` | `3600` | How long finished results are kept. |
 

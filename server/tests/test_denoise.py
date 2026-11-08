@@ -15,6 +15,7 @@ import cv2
 import numpy as np
 
 from app.pipeline.denoise import Denoiser
+from app.pipeline.low_light import classical_low_light
 
 
 def _denoiser(backend: str, weights_dir: Path | None = None) -> Denoiser:
@@ -88,5 +89,41 @@ def test_scunet_missing_weight_falls_back_to_nlm():
 
 def test_low_light_brightens_dark_image():
     dark = _flat(40)
-    out = Denoiser._enhance_low_light(dark)
+    out = classical_low_light(dark)
     assert out.mean() > dark.mean()
+
+
+def test_default_low_light_is_classical():
+    dark = _flat(40)
+    out = _denoiser("none")(dark, strength=1.0, low_light=True)
+    assert np.array_equal(out, classical_low_light(dark))
+
+
+class _RecordingEnhancer:
+    """Stands in for LowLightEnhancer; brightens by a fixed offset and records
+    what it was given."""
+
+    def __init__(self):
+        self.seen = None
+
+    def __call__(self, img):
+        self.seen = img.copy()
+        return cv2.add(img, 60)
+
+
+def test_low_light_runs_before_denoise():
+    img = _noisy()
+    enhancer = _RecordingEnhancer()
+    den = Denoiser("nlm", Path("/nonexistent-weights"), "cpu", tile=0, low_light=enhancer)
+    out = den(img, strength=1.0, low_light=True)
+    # The enhancer saw the raw input, and the denoiser saw the brightened one.
+    assert np.array_equal(enhancer.seen, img)
+    expected = cv2.fastNlMeansDenoisingColored(cv2.add(img, 60), None, 10, 10, 7, 21)
+    assert np.array_equal(out, expected)
+
+
+def test_strength_zero_with_low_light_keeps_brightened_image():
+    img = _noisy()
+    den = Denoiser("nlm", Path("/nonexistent-weights"), "cpu", tile=0, low_light=_RecordingEnhancer())
+    out = den(img, strength=0.0, low_light=True)
+    assert np.array_equal(out, cv2.add(img, 60))

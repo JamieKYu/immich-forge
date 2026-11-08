@@ -3,7 +3,7 @@
 export interface ForgeOperations {
   denoise: boolean
   denoise_strength: number // 0..1 (blend denoised result toward original)
-  low_light: boolean // classical CLAHE + gamma brighten, after denoise
+  low_light: boolean // HVI-CIDNet brighten (CLAHE fallback), before denoise
   colorize: boolean
   upscale: boolean
   upscale_factor: 2 | 4
