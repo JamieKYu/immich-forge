@@ -21,7 +21,12 @@ WEIGHTS = {
     "hvi_cidnet_generalization.safetensors": "https://huggingface.co/Fediory/HVI-CIDNet-Generalization/resolve/main/model.safetensors",
     # Real-ESRGAN x4 general model.
     "RealESRGAN_x4plus.pth": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
-    # GFPGAN v1.4 (used by both GFPGAN and as a face helper for CodeFormer).
+    # facexlib face detection (RetinaFace) + face parsing (paste-back mask),
+    # used by every face backend. facexlib would otherwise fetch these on the
+    # first face job.
+    "detection_Resnet50_Final.pth": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+    "parsing_parsenet.pth": "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
+    # GFPGAN v1.4 face restoration.
     "GFPGANv1.4.pth": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.4/GFPGANv1.4.pth",
     # CodeFormer.
     "codeformer.pth": "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth",

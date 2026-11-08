@@ -1,9 +1,9 @@
 """Upscaling stage. Prefers Real-ESRGAN on GPU; falls back to Lanczos.
 
 The network is loaded with `spandrel` (the chaiNNer/ComfyUI model loader),
-which detects the architecture from the checkpoint itself — no `realesrgan` /
-`basicsr` import, and no torchvision shim. Tiling (with OOM tile-halving) is in
-`tiling.py`, shared with the de-JPEG stage.
+which detects the architecture from the checkpoint itself — no `realesrgan`
+package. Tiling (with OOM tile-halving) is in `tiling.py`, shared with the
+de-JPEG stage.
 """
 from __future__ import annotations
 

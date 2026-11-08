@@ -123,9 +123,13 @@ redistribution or commercial use:
 | --- | --- | --- |
 | SCUNet (denoise) | vendored under `server/app/pipeline/scunet/` | Apache-2.0 ([LICENSE](server/app/pipeline/scunet/LICENSE)) |
 | DDColor (colorize) | vendored under `server/app/pipeline/ddcolor/` | Apache-2.0 ([LICENSE](server/app/pipeline/ddcolor/LICENSE)) |
-| Real-ESRGAN (upscale) | pip dependency + downloaded weights | BSD-3-Clause |
+| Real-ESRGAN (upscale) | downloaded weights, loaded via spandrel | BSD-3-Clause |
+| HVI-CIDNet (low-light) | downloaded weights, loaded via spandrel | MIT |
+| FBCNN (JPEG artifact removal) | downloaded weights, loaded via spandrel | Apache-2.0 |
 | CodeFormer (face restore, **default**) | vendored under `server/app/pipeline/codeformer/` + downloaded weights | **S-Lab License 1.0 — non-commercial** |
-| GFPGAN (alternative face backend) | pip dependency + downloaded weights | Apache-2.0 |
+| GFPGAN (alternative face backend) | downloaded weights, loaded via spandrel | Apache-2.0 |
+| spandrel (model loader) | pip dependency | MIT |
+| facexlib (face detection / alignment / paste-back) | pip dependency + downloaded weights | Apache-2.0 |
 
 > ⚠️ The **default** face backend is CodeFormer, whose code and weights are
 > licensed for **non-commercial use only** (S-Lab License 1.0). CodeFormer is
