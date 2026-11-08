@@ -1,8 +1,8 @@
 # Forge for Immich
 
 A companion to [Immich](https://immich.app) that "forges" low-quality photos —
-**denoise**, **upscale**, **face-restore**, and **colorize** old, noisy, or
-blurry images on your own GPU, then stacks the enhanced result as the new primary
+**remove JPEG artifacts**, **denoise**, **brighten**, **upscale**,
+**face-restore**, and **colorize** old, noisy, or blurry images on your own GPU, then stacks the enhanced result as the new primary
 asset in your library.
 
 > **Unofficial / independent project.** "Forge for Immich" is a community-built

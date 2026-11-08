@@ -33,6 +33,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .tiling import free_cuda, looks_like_oom
+
 log = logging.getLogger("forge.low_light")
 
 WEIGHTS = "hvi_cidnet_generalization.safetensors"
@@ -60,22 +62,6 @@ def classical_low_light(img: np.ndarray) -> np.ndarray:
         [((i / 255.0) ** gamma) * 255 for i in range(256)], dtype=np.uint8
     )
     return cv2.LUT(out, lut)
-
-
-def _looks_like_oom(exc: BaseException) -> bool:
-    name = type(exc).__name__
-    msg = str(exc).lower()
-    return name == "OutOfMemoryError" or "out of memory" in msg
-
-
-def _free_cuda() -> None:
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    except ImportError:
-        pass
 
 
 def _resize(img: np.ndarray, w: int, h: int, interpolation: int) -> np.ndarray:
@@ -178,9 +164,9 @@ class LowLightEnhancer:
                 out_lo = self._infer(lo)
                 break
             except Exception as exc:  # noqa: BLE001 - re-raised below unless OOM
-                if not _looks_like_oom(exc) or budget <= _MIN_PIXELS:
+                if not looks_like_oom(exc) or budget <= _MIN_PIXELS:
                     raise
-                _free_cuda()
+                free_cuda()
                 budget = max(_MIN_PIXELS, budget // 2)
                 log.warning("low-light OOM; retrying at %d px", budget)
         if lo is img:

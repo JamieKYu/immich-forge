@@ -17,7 +17,9 @@ pytest.importorskip("spandrel")
 
 from spandrel.architectures.ESRGAN import ESRGAN  # noqa: E402
 
-from app.pipeline.upscale import _TILE_PAD, Upscaler  # noqa: E402
+from app.pipeline import tiling  # noqa: E402
+from app.pipeline.tiling import TILE_PAD  # noqa: E402
+from app.pipeline.upscale import Upscaler  # noqa: E402
 
 
 @pytest.fixture
@@ -54,7 +56,7 @@ def test_tiled_matches_whole_image_away_from_seams(weights_dir):
     whole = _upscaler(weights_dir, tile=0)(img, 4)
     tiled = _upscaler(weights_dir, tile=128)(img, 4)
     assert tiled.shape == whole.shape
-    # Each tile sees _TILE_PAD px of context, less than the net's receptive
+    # Each tile sees TILE_PAD px of context, less than the net's receptive
     # field, so seams may differ slightly — but only slightly.
     diff = np.abs(tiled.astype(int) - whole.astype(int))
     assert diff.mean() < 1.0
@@ -65,19 +67,19 @@ def test_tiled_matches_whole_image_away_from_seams(weights_dir):
 def test_oom_shrinks_tile_and_recovers(weights_dir, monkeypatch):
     up = _upscaler(weights_dir, tile=256)
     up._model = up._load_realesrgan()
-    real_infer = up._infer
+    real_infer = tiling.infer
     seen = []
 
-    def infer(patch):
+    def infer(model, patch):
         seen.append(patch.shape[-1])
-        if patch.shape[-1] > 128 + 2 * _TILE_PAD:
+        if patch.shape[-1] > 128 + 2 * TILE_PAD:
             raise torch.OutOfMemoryError("CUDA out of memory")
-        return real_infer(patch)
+        return real_infer(model, patch)
 
-    monkeypatch.setattr(up, "_infer", infer)
+    monkeypatch.setattr(tiling, "infer", infer)
     out = up(_img(300, 300), 4)
     assert out.shape == (1200, 1200, 3)
-    fits = 128 + 2 * _TILE_PAD
+    fits = 128 + 2 * TILE_PAD
     assert max(seen) > fits and seen[-1] <= fits  # tried 256, finished at 128
 
 
@@ -85,10 +87,10 @@ def test_oom_at_every_tile_falls_back_to_lanczos(weights_dir, monkeypatch):
     up = _upscaler(weights_dir, tile=256)
     up._model = up._load_realesrgan()
 
-    def infer(patch):
+    def infer(model, patch):
         raise torch.OutOfMemoryError("CUDA out of memory")
 
-    monkeypatch.setattr(up, "_infer", infer)
+    monkeypatch.setattr(tiling, "infer", infer)
     out = up(_img(), 4)
     assert out.shape == (160, 224, 3)  # Lanczos still delivers the factor
 
@@ -97,10 +99,10 @@ def test_non_oom_error_propagates(weights_dir, monkeypatch):
     up = _upscaler(weights_dir, tile=256)
     up._model = up._load_realesrgan()
 
-    def infer(patch):
+    def infer(model, patch):
         raise ValueError("bad shape")
 
-    monkeypatch.setattr(up, "_infer", infer)
+    monkeypatch.setattr(tiling, "infer", infer)
     with pytest.raises(ValueError):
         up(_img(), 4)
 

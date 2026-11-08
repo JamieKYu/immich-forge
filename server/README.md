@@ -69,10 +69,12 @@ curl -s -X POST $API/forge/$JOB/accept -H "Authorization: Bearer $TOKEN" | jq
 
 ## Pipeline order
 
-`denoise → colorize → (face_restore + upscale)`, all exchanging BGR uint8
-ndarrays. Denoise runs *first* so sensor noise is removed before later stages —
-the upscaler especially — amplify it; it's tiled (`FORGE_TILE_SIZE`) so VRAM
-stays bounded on large sources.
+`dejpeg → denoise → colorize → (face_restore + upscale)`, all exchanging BGR
+uint8 ndarrays. De-JPEG (opt-in) runs *first*: JPEG blocking and ringing are
+part of the source as stored, so they're removed before anything brightens,
+smooths or enlarges them. Denoise runs next so sensor noise is removed before
+later stages — the upscaler especially — amplify it. Both are tiled
+(`FORGE_TILE_SIZE`) so VRAM stays bounded on large sources.
 
 When both **face restore** and **upscale** are enabled they run as a single
 stage: faces are detected/aligned on the original-resolution image (cheap, and
@@ -91,6 +93,7 @@ and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS
 
 | Stage | Backend | Source |
 |-------|---------|--------|
+| de-JPEG | FBCNN (`fbcnn` \| `none`) | pip `spandrel` + `fbcnn_color.pth` |
 | denoise | SCUNet (`scunet` \| `nlm` \| `none`) | **vendored** under `app/pipeline/scunet/` + `scunet_color_real_psnr.pth` |
 | upscale | Real-ESRGAN (`realesrgan` \| `lanczos`) | pip `spandrel` + `RealESRGAN_x4plus.pth` |
 | face restore | CodeFormer (`codeformer` \| `gfpgan` \| `gfpgan+codeformer` \| `none`) | **vendored** under `app/pipeline/codeformer/` + `codeformer.pth` (default); or pip `gfpgan` + `GFPGANv1.4.pth` |
@@ -118,6 +121,14 @@ itself and the denoiser then cleans up the noise brightening exposes. The model
 can't be tiled (its attention is global), so above `FORGE_LOW_LIGHT_MAX_PIXELS`
 (default 4MP, ~1.35GB VRAM per MP) it runs on a downscale whose brightness/colour
 is carried back to full resolution with the source's own detail re-added.
+
+**De-JPEG** (`dejpeg`, opt-in) is **FBCNN** (ICCV 2021, Apache-2.0;
+`fbcnn_color.pth`, loaded via `spandrel`). It's *blind* — it predicts the JPEG
+quality factor from the image and conditions on it — so it needs no setting.
+It removes blocking and colour blotches from heavily compressed images (q=10:
+29.8 → 32.1 dB), but lightly smooths an already-clean one, hence opt-in. Tiles
+stay on the 8×8 JPEG block grid. Without the weights it's a logged no-op
+(`FORGE_DEJPEG_BACKEND=fbcnn|none`).
 
 CodeFormer (default face backend) is vendored the same way — the arch is copied
 from sczhou/CodeFormer with the `basicsr` registry decorators stripped, and it's

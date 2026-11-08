@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ForgeClient } from '../../lib/forge-client'
-import type { ForgeOperations, JobInfo } from '../../lib/types'
+import type { JobInfo } from '../../lib/types'
 import { reloadActiveTab } from '../../lib/tabs'
 
 export function ReviewView({
   client,
   initialJob,
-  operations,
   onReforge,
   onDone,
 }: {
   client: ForgeClient
   initialJob: JobInfo
-  operations: ForgeOperations
   onReforge: () => void
   onDone: () => void
 }) {
@@ -61,13 +59,6 @@ export function ReviewView({
     }
   }
 
-  const ops = [
-    operations.denoise && (operations.low_light ? 'denoise + low-light' : 'denoise'),
-    operations.colorize && 'colorize',
-    operations.upscale && `upscale ×${operations.upscale_factor}`,
-    operations.face_restore && 'face restore',
-  ].filter(Boolean).join(' · ')
-
   if (accepted) {
     return (
       <div>
@@ -94,8 +85,6 @@ export function ReviewView({
         </button>
         <button onClick={onReforge}>Reset</button>
       </div>
-
-      <p className="muted" style={{ marginTop: 8 }}>{ops}</p>
 
       {job.notes?.map((note, i) => (
         <p key={i} className="note">{note}</p>

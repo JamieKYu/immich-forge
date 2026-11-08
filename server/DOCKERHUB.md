@@ -1,8 +1,8 @@
 # Forge for Immich — Server
 
-GPU image that **enhances your Immich photos**: AI denoising, upscaling, face restoration, and black‑and‑white colorization. It runs as a small broker next to your self‑hosted Immich — it holds your Immich API key so the browser never has to — and pairs with the **Forge for Immich** Chrome extension.
+GPU image that **enhances your Immich photos**: AI JPEG‑artifact removal, denoising, low‑light brightening, upscaling, face restoration, and black‑and‑white colorization. It runs as a small broker next to your self‑hosted Immich — it holds your Immich API key so the browser never has to — and pairs with the **Forge for Immich** Chrome extension.
 
-`denoise (SCUNet) · upscale (Real‑ESRGAN) · face restore (CodeFormer) · colorize (DDColor)`
+`de‑JPEG (FBCNN) · denoise (SCUNet) · low‑light (HVI‑CIDNet) · upscale (Real‑ESRGAN) · face restore (CodeFormer) · colorize (DDColor)`
 
 ---
 
@@ -81,6 +81,7 @@ Then open a single photo in your Immich web app, click the **Forge** toolbar ico
 | `FORGE_WEIGHTS_DIR` | `weights` | Where model weights live (mount a volume here). |
 | `FORGE_TILE_SIZE` | `512` | Upscale tile size; lower it (e.g. `256`) if you hit GPU out‑of‑memory. |
 | `FORGE_MAX_OUTPUT_PIXELS` | `100000000` | Caps output size; the upscale factor is clamped to fit. |
+| `FORGE_DEJPEG_BACKEND` | `fbcnn` | `fbcnn` (FBCNN, Apache‑2.0) or `none`. Only runs when a job asks for JPEG cleanup. |
 | `FORGE_UPSCALE_BACKEND` | `realesrgan` | `realesrgan` or `lanczos`. |
 | `FORGE_FACE_BACKEND` | `codeformer` | `codeformer` (honors Fidelity; non-commercial S-Lab license), `gfpgan` (Apache-2.0; ignores Fidelity), `gfpgan+codeformer` (GFPGAN structure then CodeFormer texture; set Fidelity low ~0.3-0.5), or `none`. |
 | `FORGE_COLORIZE_BACKEND` | `ddcolor` | `ddcolor` or `none`. |

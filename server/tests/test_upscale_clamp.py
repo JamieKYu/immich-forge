@@ -1,4 +1,4 @@
-"""Tests for the upscale clamp math and OOM detection — pure logic, no GPU.
+"""Tests for the upscale clamp math — pure logic, no GPU.
 
 The Upscaler is constructed with the lanczos backend so it stays in its
 permanently-disabled (classical) state and never touches torch.
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from app.pipeline.upscale import Upscaler, _looks_like_oom
+from app.pipeline.upscale import Upscaler
 
 
 def _upscaler(max_output_pixels: int) -> Upscaler:
@@ -60,17 +60,3 @@ def test_requested_factor_two_not_raised():
     up = _upscaler(max_output_pixels=100_000_000)
     # Clamp only lowers; a request of 2 with lots of headroom stays 2.
     assert up.effective_factor(_img(500, 500), 2) == 2
-
-
-def test_looks_like_oom_detects_by_message_and_type():
-    assert _looks_like_oom(RuntimeError("CUDA out of memory. Tried to allocate"))
-
-    class OutOfMemoryError(Exception):
-        pass
-
-    assert _looks_like_oom(OutOfMemoryError("boom"))
-
-
-def test_looks_like_oom_ignores_unrelated_errors():
-    assert not _looks_like_oom(ValueError("bad shape"))
-    assert not _looks_like_oom(RuntimeError("some other failure"))
