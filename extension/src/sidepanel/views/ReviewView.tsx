@@ -1,18 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ForgeClient } from '../../lib/forge-client'
-import type { JobInfo } from '../../lib/types'
+import { describeOperations, stageLabel } from '../../lib/operations'
+import type { ForgeOperations, JobInfo } from '../../lib/types'
 import { reloadActiveTab } from '../../lib/tabs'
+import type { AssetImage } from '../useAssetImage'
+import { Compare } from './Compare'
 
 export function ReviewView({
   client,
   initialJob,
-  onReforge,
-  onDone,
+  operations,
+  before,
+  onBack,
 }: {
   client: ForgeClient
   initialJob: JobInfo
-  onReforge: () => void
-  onDone: () => void
+  // What this job was submitted with (for labels and the summary).
+  operations: ForgeOperations
+  before: AssetImage
+  // Back to the photo screen with the same choices. An unsaved result is
+  // simply left behind; nothing reaches Immich without "Save to Immich".
+  onBack: () => void
 }) {
   const [job, setJob] = useState<JobInfo>(initialJob)
   const [after, setAfter] = useState<string | null>(null)
@@ -61,54 +69,65 @@ export function ReviewView({
 
   if (accepted) {
     return (
-      <div>
-        <p>Forged image now stacked as the new primary.</p>
-        <button className="primary" style={{ width: '100%' }} onClick={onDone}>
-          Done
-        </button>
-      </div>
+      <>
+        <div className="body">
+          <p>Saved. The forged image is now the primary photo in its Immich stack.</p>
+        </div>
+        <div className="actionbar">
+          <button className="primary" onClick={onBack}>
+            Done
+          </button>
+        </div>
+      </>
     )
   }
 
-  return (
-    <div>
-      {error && <p className="error">{error}</p>}
+  const failed = job.status === 'error' || !!error
 
-      <div className="row">
+  return (
+    <>
+      <div className="body">
+        {error && <p className="error" style={{ marginTop: 0 }}>{error}</p>}
+        {job.notes?.map((note, i) => (
+          <p key={i} className="note">
+            {note}
+          </p>
+        ))}
+
+        {after ? (
+          <Compare before={before.src} after={after} onBeforeError={before.onError} />
+        ) : !failed ? (
+          // While forging, show live progress in place of the image.
+          <div className="processing">
+            <span className="muted">
+              {job.status === 'done'
+                ? 'Loading result'
+                : stageLabel(job.status === 'queued' ? 'queued' : job.stage, operations)}
+              …
+            </span>
+            <span className="pct">{Math.round(job.progress * 100)}%</span>
+            <div className="bar">
+              <div style={{ width: `${Math.max(5, job.progress * 100)}%` }} />
+            </div>
+          </div>
+        ) : null}
+
+        <p className="caption muted">{describeOperations(operations).join(' · ')}</p>
+      </div>
+
+      {/* Primary action rightmost (macOS / Chrome convention). */}
+      <div className="actionbar">
+        <button onClick={onBack} disabled={accepting} title="Throw this result away and go back to the settings">
+          Discard
+        </button>
         <button
           className="accept"
-          style={{ flex: 1 }}
-          disabled={job.status !== 'done' || accepting}
+          disabled={job.status !== 'done' || !after || accepting}
           onClick={accept}
         >
-          {accepting ? 'Stacking…' : 'Save to Immich'}
+          {accepting ? 'Saving…' : 'Save to Immich'}
         </button>
-        <button onClick={onReforge}>Reset</button>
       </div>
-
-      {job.notes?.map((note, i) => (
-        <p key={i} className="note">{note}</p>
-      ))}
-
-      <div className="compare" style={{ marginTop: 8 }}>
-        <figure>
-          {after ? (
-            <>
-              <img src={after} />
-              <figcaption>Forged</figcaption>
-            </>
-          ) : (
-            // While forging, show live progress in place of the image.
-            <div className="processing">
-              <span className="muted">{job.stage ?? job.status}…</span>
-              <span className="pct">{Math.round(job.progress * 100)}%</span>
-              <div className="bar">
-                <div style={{ width: `${Math.max(5, job.progress * 100)}%` }} />
-              </div>
-            </div>
-          )}
-        </figure>
-      </div>
-    </div>
+    </>
   )
 }

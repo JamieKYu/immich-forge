@@ -1,5 +1,5 @@
 // HTTP client for the Forge server. Cross-origin calls reach the user's Forge
-// origin via the optional host permission granted at settings-save time (see
+// origin via the optional host permission granted when the server is saved on the options page (see
 // lib/host-permissions); without it, fetches fail and the panel prompts to grant.
 
 import type {
@@ -8,8 +8,19 @@ import type {
   ForgeOperations,
   ImmichAsset,
   JobInfo,
+  ModelsInfo,
   Settings,
 } from './types'
+
+// Error carrying the HTTP status, so callers can tell e.g. 401 from 503.
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+  }
+}
 
 export class ForgeClient {
   constructor(private settings: Settings) {}
@@ -29,6 +40,13 @@ export class ForgeClient {
   async health(): Promise<{ ok: boolean; immich: boolean; gpu: unknown }> {
     const r = await fetch(`${this.base}/health`)
     if (!r.ok) throw new Error(`health ${r.status}`)
+    return r.json()
+  }
+
+  // Active backend per stage. Needs the token, so it doubles as an auth check.
+  async models(): Promise<ModelsInfo> {
+    const r = await fetch(`${this.base}/models`, { headers: this.headers() })
+    if (!r.ok) throw new HttpError(`models ${r.status}`, r.status)
     return r.json()
   }
 
