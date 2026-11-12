@@ -48,9 +48,15 @@ export interface ImmichAsset {
 export interface Settings {
   forgeUrl: string // e.g. http://gpu-host:8000
   forgeToken: string
-  // Sticky default enhancements, edited on the settings page.
+  // Default enhancements every photo starts from. Edited on the options page.
   operations: ForgeOperations
+  // Stored-settings schema version; see storage.ts for migrations.
+  version?: number
 }
+
+// GET /models: active backend per stage, e.g. { dejpeg: 'fbcnn', face: 'none' }.
+// A stage key missing entirely means the server predates that stage.
+export type ModelsInfo = Record<string, string>
 
 export const DEFAULT_OPERATIONS: ForgeOperations = {
   dejpeg: false,
@@ -62,6 +68,4 @@ export const DEFAULT_OPERATIONS: ForgeOperations = {
   upscale_factor: 4,
   face_restore: false,
   face_fidelity: 0.95, // lean strongly toward fidelity: lower values let CodeFormer reinvent eyes (mismatched iris colour)
-
-
 }

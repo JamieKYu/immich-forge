@@ -3,7 +3,7 @@ import { defineManifest } from '@crxjs/vite-plugin'
 // The Forge server lives at a user-defined address, so its origin isn't known
 // at build time. Rather than request broad host access up front, we declare it
 // as OPTIONAL and request just the user's Forge origin at runtime (on the
-// settings-save gesture) via chrome.permissions.request — see lib/host-permissions.
+// options page's "Save & test" gesture) via chrome.permissions.request — see lib/host-permissions.
 export default defineManifest({
   manifest_version: 3,
   name: 'Forge for Immich',
@@ -19,6 +19,11 @@ export default defineManifest({
   },
   side_panel: {
     default_path: 'src/sidepanel/index.html',
+  },
+  // Server URL + token and default enhancements: set once, out of the panel.
+  options_ui: {
+    page: 'src/options/index.html',
+    open_in_tab: true,
   },
   // Brand icon (extensions page / menus): the active, colored mark.
   icons: {

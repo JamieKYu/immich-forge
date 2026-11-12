@@ -32,6 +32,30 @@ describe('loadSettings', () => {
     expect(s.operations.upscale).toBe(DEFAULT_OPERATIONS.upscale)
     expect(s.operations.upscale_factor).toBe(DEFAULT_OPERATIONS.upscale_factor)
   })
+
+  it('drops a stale low_light from pre-v2 settings when denoise was off', async () => {
+    // v1 hid the Brighten checkbox while denoise was off, so it never ran.
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({
+      forgeSettings: { operations: { denoise: false, low_light: true } },
+    })
+    const s = await loadSettings()
+    expect(s.operations.low_light).toBe(false)
+    expect(s.version).toBe(2)
+  })
+
+  it('keeps low_light from pre-v2 settings when denoise was on', async () => {
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({
+      forgeSettings: { operations: { denoise: true, low_light: true } },
+    })
+    expect((await loadSettings()).operations.low_light).toBe(true)
+  })
+
+  it('keeps brighten-only defaults saved by v2', async () => {
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({
+      forgeSettings: { version: 2, operations: { denoise: false, low_light: true } },
+    })
+    expect((await loadSettings()).operations.low_light).toBe(true)
+  })
 })
 
 describe('saveSettings', () => {
@@ -42,6 +66,8 @@ describe('saveSettings', () => {
       operations: DEFAULT_OPERATIONS,
     }
     await saveSettings(settings)
-    expect(chrome.storage.local.set).toHaveBeenCalledWith({ forgeSettings: settings })
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      forgeSettings: { ...settings, version: 2 },
+    })
   })
 })
