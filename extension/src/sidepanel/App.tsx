@@ -2,12 +2,20 @@ import { useEffect, useState } from 'react'
 import { type ConnectionResult, testConnection } from '../lib/connection'
 import { ForgeClient } from '../lib/forge-client'
 import { ensureForgeAccess, forgeOriginPattern, hasForgeAccess } from '../lib/host-permissions'
-import { loadSettings, onSettingsChanged } from '../lib/storage'
-import type { ForgeOperations, ImmichAsset, JobInfo, ModelsInfo, Settings } from '../lib/types'
+import { suggestedOperations } from '../lib/operations'
+import { loadSettings, onSettingsChanged, saveSettings } from '../lib/storage'
+import type {
+  ForgeOperations,
+  ImmichAsset,
+  JobInfo,
+  Mode,
+  ModelsInfo,
+  Settings,
+} from '../lib/types'
 import { GearIcon } from '../ui/icons'
 import { useActiveAsset } from './useActiveAsset'
 import { useAssetImage } from './useAssetImage'
-import { PhotoView } from './views/PhotoView'
+import { type PhotoAnalysis, PhotoView } from './views/PhotoView'
 import { ReviewView } from './views/ReviewView'
 
 // Server setup lives on Chrome's options page; the panel only links there.
@@ -75,6 +83,8 @@ export function App() {
         client={client}
         assetId={assetId}
         defaults={settings.operations}
+        mode={settings.mode}
+        onSaveMode={(mode) => void saveSettings({ ...settings, mode })}
         models={models}
       />
     )
@@ -163,23 +173,31 @@ function GrantAccess({ forgeUrl, onGranted }: { forgeUrl: string; onGranted: () 
 }
 
 // Photo screen → review flow for one asset. Remounts (resets) when assetId
-// changes. Holds this photo's one-off enhancement choices, so "Discard" from
-// review comes back with them intact.
+// changes. Holds this photo's analysis, mode and one-off enhancement choices,
+// so "Discard" from review comes back with them intact.
 function PhotoForge({
   client,
   assetId,
   defaults,
+  mode,
+  onSaveMode,
   models,
 }: {
   client: ForgeClient
   assetId: string
   defaults: ForgeOperations
+  // The remembered mode; this photo opens in it.
+  mode: Mode
+  onSaveMode: (mode: Mode) => void
   models: ModelsInfo | null
 }) {
   const [asset, setAsset] = useState<ImmichAsset | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [job, setJob] = useState<{ info: JobInfo; operations: ForgeOperations } | null>(null)
-  const [operations, setOperations] = useState<ForgeOperations>(defaults)
+  const [analysis, setAnalysis] = useState<PhotoAnalysis>({ state: 'loading' })
+  const [photoMode, setPhotoMode] = useState<Mode>(mode)
+  const [customOps, setCustomOps] = useState<ForgeOperations>(defaults)
+  const [adjustedFromAuto, setAdjustedFromAuto] = useState(false)
   // Loaded once here and shared by the photo screen and the before/after view.
   const preview = useAssetImage(client, assetId)
 
@@ -190,6 +208,54 @@ function PhotoForge({
       .then(setAsset)
       .catch((e: Error) => setError(e.message))
   }, [assetId])
+
+  // Quality precheck + Auto suggestions, fetched once per photo. Best-effort:
+  // a failure (or an older server) just means no warning and no Auto mode.
+  useEffect(() => {
+    let live = true
+    client
+      .analyze(assetId, defaults)
+      .then((a) =>
+        live &&
+        setAnalysis({
+          state: 'done',
+          lowQuality: a.low_quality,
+          suggested: suggestedOperations(a),
+          reasons: a.reasons ?? {},
+        }),
+      )
+      .catch(
+        () => live && setAnalysis({ state: 'done', lowQuality: false, suggested: null, reasons: {} }),
+      )
+    return () => {
+      live = false
+    }
+  }, [assetId])
+
+  // Auto is offered while analyzing and when the server returned suggestions.
+  const autoAvailable = analysis.state === 'loading' || analysis.suggested !== null
+  const effectiveMode: Mode = photoMode === 'auto' && autoAvailable ? 'auto' : 'custom'
+  const operations =
+    effectiveMode === 'auto'
+      ? analysis.state === 'done' ? analysis.suggested : null
+      : customOps
+
+  function changeOperations(next: ForgeOperations) {
+    // Editing a suggestion makes this photo Custom (starting from the
+    // suggestions); the remembered mode is unchanged.
+    if (effectiveMode === 'auto') {
+      setPhotoMode('custom')
+      setAdjustedFromAuto(true)
+    }
+    setCustomOps(next)
+  }
+
+  function changeMode(next: Mode) {
+    setPhotoMode(next)
+    setAdjustedFromAuto(false)
+    if (next === 'custom') setCustomOps(defaults)
+    onSaveMode(next) // remembered for the next photo
+  }
 
   // Fall back to a minimal asset shell if metadata hasn't loaded yet; the id is
   // all the server needs to forge.
@@ -229,9 +295,14 @@ function PhotoForge({
       client={client}
       asset={subject}
       preview={preview}
-      operations={operations}
-      onOperationsChange={setOperations}
       models={models}
+      analysis={analysis}
+      mode={effectiveMode}
+      autoAvailable={autoAvailable}
+      adjustedFromAuto={adjustedFromAuto}
+      operations={operations}
+      onOperationsChange={changeOperations}
+      onModeChange={changeMode}
       onSubmitted={(info, ops) => setJob({ info, operations: ops })}
     />
   )

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { type GatedOperation, unavailableReason } from '../lib/operations'
-import type { ForgeOperations, ModelsInfo } from '../lib/types'
+import type { ForgeOperations, ModelsInfo, OperationKey } from '../lib/types'
 import { Switch } from './Switch'
 
 // The enhancement options, grouped by intent rather than pipeline order:
@@ -12,14 +12,20 @@ export function EnhancementControls({
   operations,
   onChange,
   models,
+  notes,
 }: {
   operations: ForgeOperations
   onChange: (next: ForgeOperations) => void
   // Server capabilities; null = unknown (everything shown as available).
   models: ModelsInfo | null
+  // Per-option lines shown instead of the generic help (Auto mode's reasons).
+  // `suggested` highlights the ones Auto turned on, whatever the switch shows
+  // now.
+  notes?: Partial<Record<OperationKey, { text: string; suggested: boolean }>>
 }) {
   const set = (patch: Partial<ForgeOperations>) => onChange({ ...operations, ...patch })
   const reason = (op: GatedOperation) => unavailableReason(models, op)
+  const note = (op: OperationKey) => notes?.[op]
 
   return (
     <div className="controls">
@@ -28,6 +34,7 @@ export function EnhancementControls({
 
         <Option
           title="Clean up JPEG blocks"
+          note={note('dejpeg')}
           help="Removes blocky compression artifacts. Can soften photos that are already clean."
           unavailable={reason('dejpeg')}
           control={
@@ -42,6 +49,7 @@ export function EnhancementControls({
 
         <Option
           title="Reduce noise"
+          note={note('denoise')}
           help="Smooths grain from high-ISO shots and old scans."
           unavailable={reason('denoise')}
           control={
@@ -69,6 +77,7 @@ export function EnhancementControls({
 
         <Option
           title="Brighten dark photo"
+          note={note('low_light')}
           help="Lifts underexposed shots. Pair with Reduce noise to clean up what brightening reveals."
           control={
             <Switch
@@ -85,6 +94,7 @@ export function EnhancementControls({
 
         <Option
           title="Enlarge"
+          note={note('upscale')}
           help="More pixels for printing and zooming in."
           control={
             <div className="seg" role="radiogroup" aria-label="Enlarge">
@@ -110,6 +120,7 @@ export function EnhancementControls({
 
         <Option
           title="Restore faces"
+          note={note('face_restore')}
           help="Sharpens soft or blurry faces."
           unavailable={reason('face_restore')}
           control={
@@ -140,6 +151,7 @@ export function EnhancementControls({
 
         <Option
           title="Colorize"
+          note={note('colorize')}
           help="Adds color to black-and-white photos."
           unavailable={reason('colorize')}
           control={
@@ -159,12 +171,14 @@ export function EnhancementControls({
 function Option({
   title,
   help,
+  note,
   unavailable,
   control,
   children,
 }: {
   title: string
   help: string
+  note?: { text: string; suggested: boolean }
   unavailable?: string | null
   control: ReactNode
   children?: ReactNode
@@ -175,7 +189,13 @@ function Option({
         <span className="option-title">{title}</span>
         {control}
       </div>
-      <p className="option-help">{unavailable ?? help}</p>
+      {unavailable ? (
+        <p className="option-help">{unavailable}</p>
+      ) : note ? (
+        <p className={`option-help note-line${note.suggested ? ' on' : ''}`}>{note.text}</p>
+      ) : (
+        <p className="option-help">{help}</p>
+      )}
       {children}
     </div>
   )

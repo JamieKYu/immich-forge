@@ -78,8 +78,12 @@ class Signals:
     iso: int | None
     luma_median: float
     luma_p95: float
+    black_fraction: float       # share of near-black pixels (<= 20 of 255)
+    lit_median: float           # median brightness of the remaining pixels
     chroma_p95: float
     hue_concentration: float
+    tint_hue: float               # dominant hue angle in Lab a/b, degrees 0-360
+    strong_color_fraction: float  # share of strongly coloured pixels (chroma > 25)
     faces: list[Face] | None    # None: face detection unavailable
 
     def metrics(self) -> dict[str, float]:
@@ -89,8 +93,12 @@ class Signals:
             "noise_sigma": self.noise_sigma,
             "luma_median": self.luma_median,
             "luma_p95": self.luma_p95,
+            "black_fraction": self.black_fraction,
+            "lit_median": self.lit_median,
             "chroma_p95": self.chroma_p95,
             "hue_concentration": self.hue_concentration,
+            "tint_hue": self.tint_hue,
+            "strong_color_fraction": self.strong_color_fraction,
         }
         if self.jpeg_quality is not None:
             out["jpeg_quality"] = self.jpeg_quality
@@ -221,19 +229,41 @@ def jpeg_blocking(img: np.ndarray) -> float:
     return max(0.0, (axis_step(across_cols) + axis_step(across_rows)) / 2.0)
 
 
-def exposure(img: np.ndarray) -> tuple[float, float]:
-    """(median, 95th percentile) brightness, 0-255."""
+_NEAR_BLACK = 20  # grey level at or below which a pixel counts as black
+
+
+def exposure(img: np.ndarray) -> tuple[float, float, float, float]:
+    """(median, 95th percentile, near-black share, median of the rest), 0-255.
+
+    The last two tell a lit subject against a black background (a flash or
+    torch-lit photo at night or in a cave: mostly black, the rest properly
+    exposed) from a dim scene (the lit parts are dark too)."""
     gray = cv2.cvtColor(_work_copy(img), cv2.COLOR_BGR2GRAY)
-    return float(np.median(gray)), float(np.percentile(gray, 95))
+    black = gray <= _NEAR_BLACK
+    lit = gray[~black]
+    return (
+        float(np.median(gray)),
+        float(np.percentile(gray, 95)),
+        float(black.mean()),
+        float(np.median(lit)) if lit.size else 0.0,
+    )
 
 
-def color_stats(img: np.ndarray) -> tuple[float, float]:
-    """(95th-percentile chroma, hue concentration).
+_STRONG_CHROMA = 25.0  # chroma above which a pixel is unmistakably coloured
+
+
+def color_stats(img: np.ndarray) -> tuple[float, float, float, float]:
+    """(95th-percentile chroma, hue concentration, dominant hue angle,
+    strongly coloured share).
 
     Chroma is the distance from neutral grey in Lab's a/b plane (0 for a true
     black-and-white image). Hue concentration is the chroma-weighted mean
     resultant length of the hue angles: near 1 when all the colour is one hue
-    (sepia, a cyanotype), lower for a normal colour photo.
+    (sepia, a cyanotype), lower for a normal colour photo. The dominant hue says
+    which way the tint leans: sepia and toned prints are warm (brown/yellow),
+    a white-balance cast on snow is cool. The strongly coloured share catches a
+    mostly neutral photo with some real colour in it (a coloured house, a UI
+    icon): a genuine sepia or black-and-white print has none.
 
     Chroma shrinks with lightness, so a dark colour photo would read as
     black-and-white. The copy is first scaled up so its highlights sit at a
@@ -253,10 +283,13 @@ def color_stats(img: np.ndarray) -> tuple[float, float]:
     chroma = np.hypot(a, b)
     total = float(chroma.sum())
     if total < 1e-6:
-        return 0.0, 1.0
+        return 0.0, 1.0, 0.0, 0.0
     # sum(chroma * unit hue vector) == sum of the (a, b) vectors themselves.
-    concentration = math.hypot(float(a.sum()), float(b.sum())) / total
-    return float(np.percentile(chroma, 95)), float(concentration)
+    sum_a, sum_b = float(a.sum()), float(b.sum())
+    concentration = math.hypot(sum_a, sum_b) / total
+    hue = math.degrees(math.atan2(sum_b, sum_a)) % 360.0
+    strong = float((chroma > _STRONG_CHROMA).mean())
+    return float(np.percentile(chroma, 95)), float(concentration), hue, strong
 
 
 def measure(
@@ -265,8 +298,8 @@ def measure(
     face_detector: "FaceDetector | None" = None,
 ) -> Signals:
     h, w = img.shape[:2]
-    luma_median, luma_p95 = exposure(img)
-    chroma_p95, hue = color_stats(img)
+    luma_median, luma_p95, black_fraction, lit_median = exposure(img)
+    chroma_p95, hue, tint_hue, strong = color_stats(img)
     return Signals(
         width=w,
         height=h,
@@ -276,8 +309,12 @@ def measure(
         iso=read_iso(data),
         luma_median=luma_median,
         luma_p95=luma_p95,
+        black_fraction=black_fraction,
+        lit_median=lit_median,
         chroma_p95=chroma_p95,
         hue_concentration=hue,
+        tint_hue=tint_hue,
+        strong_color_fraction=strong,
         faces=face_detector.detect(img) if face_detector else None,
     )
 
@@ -293,15 +330,20 @@ def decide(s: Signals, settings) -> Suggestion:
     def off_on_server(backend: str) -> bool:
         return backend == "none"
 
-    # Colorize: only black-and-white or single-tint photos. Colorizing a colour
-    # photo would replace its real colours.
-    if s.chroma_p95 <= settings.auto_gray_chroma_max:
+    # Colorize: only black-and-white or warm single-tint (sepia-toned) photos,
+    # with no real colour anywhere. Colorizing a colour photo would replace its
+    # real colours.
+    has_colour = s.strong_color_fraction >= settings.auto_strong_color_min
+    warm_tint = settings.auto_tint_angle_min <= s.tint_hue <= settings.auto_tint_angle_max
+    if not has_colour and s.chroma_p95 <= settings.auto_gray_chroma_max:
         ops.colorize, reasons["colorize"] = True, "black-and-white photo"
     elif (
-        s.chroma_p95 <= settings.auto_tint_chroma_max
+        not has_colour
+        and warm_tint
+        and s.chroma_p95 <= settings.auto_tint_chroma_max
         and s.hue_concentration >= settings.auto_tint_hue_min
     ):
-        ops.colorize, reasons["colorize"] = True, "single-tint photo (e.g. sepia)"
+        ops.colorize, reasons["colorize"] = True, "sepia-toned photo"
     else:
         reasons["colorize"] = "already in color"
     if ops.colorize and off_on_server(settings.colorize_backend):
@@ -335,8 +377,16 @@ def decide(s: Signals, settings) -> Suggestion:
         ops.dejpeg, reasons["dejpeg"] = False, "turned off on this server"
 
     # Brighten: dark overall, without bright highlights (a silhouette against a
-    # bright sky isn't underexposed).
-    if s.luma_median <= settings.auto_dark_median_max and s.luma_p95 <= settings.auto_dark_p95_max:
+    # bright sky isn't underexposed) — and not a lit subject against a black
+    # background, where brightening only turns the black into grey murk.
+    dark = s.luma_median <= settings.auto_dark_median_max and s.luma_p95 <= settings.auto_dark_p95_max
+    lit_subject = (
+        s.black_fraction >= settings.auto_black_background_min
+        and s.lit_median >= settings.auto_lit_subject_min
+    )
+    if dark and lit_subject:
+        reasons["low_light"] = "dark background, subject well lit"
+    elif dark:
         ops.low_light = True
         reasons["low_light"] = f"underexposed (median brightness {s.luma_median / 2.55:.0f}%)"
     else:

@@ -267,7 +267,8 @@ function DefaultsSection({
     <section>
       <h2>Default enhancements</h2>
       <p className="muted">
-        Every photo starts with these. You can change them per photo in the side panel. Changes
+        In Custom mode, every photo starts with these. In Auto mode, Forge suggests settings for
+        each photo instead. Either way you can change them per photo in the side panel. Changes
         save automatically.
       </p>
       <EnhancementControls operations={settings.operations} onChange={update} models={models} />

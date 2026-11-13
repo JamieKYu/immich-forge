@@ -1,7 +1,12 @@
 // Pure helpers around ForgeOperations: what the UI shows vs. what the server
 // is sent, plain-language labels, and server capability checks.
 
-import type { ForgeOperations, ModelsInfo } from './types'
+import {
+  DEFAULT_OPERATIONS,
+  type ForgeAnalysis,
+  type ForgeOperations,
+  type ModelsInfo,
+} from './types'
 
 // The UI treats "Reduce noise" and "Brighten dark photo" as independent
 // switches, but the server only brightens inside its denoise stage (low_light
@@ -13,6 +18,13 @@ export function toRequest(ops: ForgeOperations): ForgeOperations {
     return { ...ops, denoise: true, denoise_strength: 0 }
   }
   return ops
+}
+
+// The server's suggested operations as a complete set, or null when the server
+// doesn't do Auto mode (older servers omit `suggested`).
+export function suggestedOperations(analysis: ForgeAnalysis | null): ForgeOperations | null {
+  if (!analysis?.suggested) return null
+  return { ...DEFAULT_OPERATIONS, ...analysis.suggested }
 }
 
 // Plain-language summary of what will run, in the same order as the controls.

@@ -4,7 +4,7 @@
 // one to fix.
 
 import { ForgeClient } from './forge-client'
-import { DEFAULT_OPERATIONS, type ModelsInfo } from './types'
+import type { ModelsInfo } from './types'
 
 export type ConnectionResult =
   | { ok: true; immich: boolean; models: ModelsInfo }
@@ -34,7 +34,7 @@ export async function testConnection(
       message: 'Enter a full address, e.g. http://gpu-host:8000',
     }
   }
-  const client = new ForgeClient({ forgeUrl, forgeToken, operations: DEFAULT_OPERATIONS })
+  const client = new ForgeClient({ forgeUrl, forgeToken })
 
   // /health needs no token: it tells us the server is there at all.
   let immich: boolean

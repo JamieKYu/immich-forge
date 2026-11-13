@@ -10,6 +10,7 @@ const DEFAULTS: Settings = {
   forgeUrl: '',
   forgeToken: '',
   operations: DEFAULT_OPERATIONS,
+  mode: 'auto',
   version: SETTINGS_VERSION,
 }
 
@@ -23,7 +24,11 @@ export async function loadSettings(): Promise<Settings> {
   if (stored && (stored.version ?? 1) < 2 && !operations.denoise) {
     operations.low_light = false
   }
-  return { ...DEFAULTS, ...stored, operations, version: SETTINGS_VERSION }
+  // New installs (nothing saved) start in Auto. Settings saved before Auto
+  // mode existed have no `mode`: those users keep Custom, the behaviour they
+  // had, and can switch to Auto themselves.
+  const mode = stored?.mode ?? (stored ? 'custom' : 'auto')
+  return { ...DEFAULTS, ...stored, operations, mode, version: SETTINGS_VERSION }
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {

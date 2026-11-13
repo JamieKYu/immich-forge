@@ -1,60 +1,86 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ForgeClient } from '../../lib/forge-client'
-import {
-  describeOperations,
-  toRequest,
-  withoutUnavailable,
-} from '../../lib/operations'
-import type { ForgeOperations, ImmichAsset, JobInfo, ModelsInfo } from '../../lib/types'
+import { describeOperations, toRequest, withoutUnavailable } from '../../lib/operations'
+import type {
+  ForgeOperations,
+  ImmichAsset,
+  JobInfo,
+  Mode,
+  ModelsInfo,
+  OperationKey,
+} from '../../lib/types'
 import { EnhancementControls } from '../../ui/EnhancementControls'
 import type { AssetImage } from '../useAssetImage'
 
-// The photo screen: preview, this photo's enhancement choices, and a sticky
-// Forge button. Choices start from the defaults set on the options page and
-// apply to this photo only.
+// Result of /analyze for this photo. `suggested` is null when the server
+// doesn't do Auto mode (or the call failed).
+export type PhotoAnalysis =
+  | { state: 'loading' }
+  | {
+      state: 'done'
+      lowQuality: boolean
+      suggested: ForgeOperations | null
+      reasons: Partial<Record<OperationKey, string>>
+    }
+
+// The photo screen: preview, the Auto | Custom switch, this photo's
+// enhancements, and a sticky Forge button. Auto shows the server's
+// suggestions with a reason per option; Custom starts from the defaults on the
+// options page. Either way, changes apply to this photo only.
 export function PhotoView({
   client,
   asset,
   preview,
+  models,
+  analysis,
+  mode,
+  autoAvailable,
+  adjustedFromAuto,
   operations,
   onOperationsChange,
-  models,
+  onModeChange,
   onSubmitted,
 }: {
   client: ForgeClient
   asset: ImmichAsset
   preview: AssetImage
-  operations: ForgeOperations
-  onOperationsChange: (ops: ForgeOperations) => void
   models: ModelsInfo | null
+  analysis: PhotoAnalysis
+  // The mode in effect for this photo.
+  mode: Mode
+  // False when the server can't suggest (older server): no switch is shown.
+  autoAvailable: boolean
+  // Custom, but started from the suggestions (the user changed an option).
+  adjustedFromAuto: boolean
+  // What will run; null while Auto is still analyzing.
+  operations: ForgeOperations | null
+  onOperationsChange: (ops: ForgeOperations) => void
+  onModeChange: (mode: Mode) => void
   onSubmitted: (job: JobInfo, ops: ForgeOperations) => void
 }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lowQuality, setLowQuality] = useState(false)
 
   // What will actually run: options the server can't do are dropped.
-  const effective = withoutUnavailable(operations, models)
-  const summary = describeOperations(effective)
-  const nothingSelected = summary.length === 0
+  const effective = operations && withoutUnavailable(operations, models)
+  const summary = effective ? describeOperations(effective) : []
+  const nothingSelected = !!effective && summary.length === 0
   const notImage = !!asset.type && asset.type !== 'IMAGE'
-
-  // Best-effort source-quality precheck: warn (softly, never blocking) when the
-  // original is too degraded for the enhancement to deliver much. Any failure
-  // (server down, older server without /analyze) just leaves the warning off.
-  useEffect(() => {
-    if (notImage) return
-    let live = true
-    client
-      .analyze(asset.id, toRequest(effective))
-      .then((a) => live && setLowQuality(a.low_quality))
-      .catch(() => live && setLowQuality(false))
-    return () => {
-      live = false
-    }
-  }, [asset.id, notImage])
+  const done = analysis.state === 'done' ? analysis : null
+  // Auto's reasons replace the help text while the suggestions are in play.
+  // Highlight the ones Auto suggested, not whatever the switches show now.
+  const notes =
+    done?.suggested && (mode === 'auto' || adjustedFromAuto)
+      ? Object.fromEntries(
+          Object.entries(done.reasons).map(([op, text]) => [
+            op,
+            { text: text!, suggested: !!done.suggested![op as OperationKey] },
+          ]),
+        )
+      : undefined
 
   async function submit() {
+    if (!effective) return
     setSubmitting(true)
     setError(null)
     try {
@@ -65,6 +91,18 @@ export function PhotoView({
       setSubmitting(false)
     }
   }
+
+  // One line beside the switch; Auto's verdicts are green like the suggestions.
+  const caption: { text: string; suggested?: boolean } | null =
+    mode === 'auto'
+      ? !done
+        ? { text: 'Analyzing this photo…' }
+        : nothingSelected
+          ? { text: 'This photo looks good as it is', suggested: true }
+          : { text: 'Suggested for this photo', suggested: true }
+      : adjustedFromAuto
+        ? { text: 'Adjusted from the suggestions' }
+        : null
 
   const w = asset.exifInfo?.exifImageWidth
   const h = asset.exifInfo?.exifImageHeight
@@ -87,26 +125,59 @@ export function PhotoView({
             This asset is a {asset.type.toLowerCase()}; only images can be forged.
           </p>
         )}
-        {lowQuality && !notImage && (
+        {done?.lowQuality && !notImage && (
           <p className="note">This original has low detail, so results may be limited.</p>
         )}
 
-        <EnhancementControls
-          operations={operations}
-          onChange={onOperationsChange}
-          models={models}
-        />
+        {autoAvailable && (
+          <div className="mode-row">
+            <div className="seg" role="radiogroup" aria-label="Mode">
+              {(['auto', 'custom'] as const).map((m) => (
+                <label key={m} className={mode === m ? 'active' : ''}>
+                  <input
+                    type="radio"
+                    name="mode"
+                    checked={mode === m}
+                    onChange={() => onModeChange(m)}
+                  />
+                  {m === 'auto' ? 'Auto' : 'Custom'}
+                </label>
+              ))}
+            </div>
+            {caption && (
+              <span className={`mode-caption${caption.suggested ? ' suggested' : ' muted'}`}>
+                {caption.text}
+              </span>
+            )}
+          </div>
+        )}
 
+        {operations ? (
+          <EnhancementControls
+            operations={operations}
+            onChange={onOperationsChange}
+            models={models}
+            notes={notes}
+          />
+        ) : (
+          <div className="analyzing" aria-busy="true" />
+        )}
       </div>
 
       <div className="actionbar">
         {error && <p className="error actionbar-error">{error}</p>}
         <p className="actionbar-summary muted">
-          {nothingSelected ? 'Turn on at least one enhancement' : summary.join(' · ')}
+          {!effective
+            ? 'Analyzing…'
+            : nothingSelected
+              ? mode === 'auto'
+                ? 'Nothing suggested. Switch to Custom to choose'
+                : 'Turn on at least one enhancement'
+              : summary.join(' · ')}
         </p>
         <button
           className="primary"
-          disabled={submitting || nothingSelected || notImage}
+          disabled={submitting || !effective || nothingSelected || notImage}
           onClick={submit}
         >
           {submitting ? 'Submitting…' : 'Forge'}

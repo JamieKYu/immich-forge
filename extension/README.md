@@ -44,8 +44,14 @@ Then load it in Chrome:
 4. Open a photo in Immich (`…/photos/<id>`) — the icon lights up (colored).
    Click it, choose enhancements for that photo, and **Forge**.
 
-Every photo starts from the default enhancements set on the options page;
-changes on the photo screen apply to that photo only. Options the connected server lacks or has turned off are
+The photo screen has an **Auto | Custom** switch. **Auto** (the default for new
+installs) starts each photo from the server's suggestions, with a short reason
+under every option, e.g. "800×600 source" or "already in color". **Custom**
+starts from the default enhancements set on the options page. Changing an
+option in Auto turns that photo into Custom, starting from the suggestions;
+clicking the switch itself is remembered for the next photo. Changes on the
+photo screen apply to that photo only. Servers without Auto suggestions (before
+the release that added them) get no switch, just Custom. Options the connected server lacks or has turned off are
 greyed out with the reason.
 
 `npm run dev` rebuilds on change (reload the unpacked extension to pick up

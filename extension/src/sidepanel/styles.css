@@ -90,6 +90,13 @@ label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 12px
 .preview.placeholder { aspect-ratio: 4 / 3; background: var(--panel); }
 .caption { margin: 6px 0 0; font-size: 11px; word-break: break-word; }
 
+/* Auto | Custom switch with a one-line caption. */
+.mode-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; }
+.mode-caption { font-size: 12px; }
+.mode-caption.suggested { color: var(--accent-2); }
+/* Placeholder while Auto analyzes, so the layout doesn't jump. */
+.analyzing { height: 220px; margin-top: 16px; border-radius: 8px; background: var(--panel); opacity: 0.5; }
+
 /* Enhancement options, grouped "Repair" / "Enhance". */
 .controls { margin-top: 6px; }
 h2.group {
@@ -109,6 +116,8 @@ h2.group {
 .option-help { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
 .option.unavailable .option-title { color: var(--muted); }
 .option.unavailable .option-help { color: #e6c07b; }
+/* Auto mode: the server's reason; suggested options are highlighted. */
+.option-help.note-line.on { color: var(--accent-2); }
 .finetune { margin-top: 6px; font-size: 12px; }
 .finetune summary { cursor: pointer; color: var(--muted); }
 .finetune summary:hover { color: var(--text); }
