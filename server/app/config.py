@@ -104,6 +104,15 @@ class Settings(BaseSettings):
     # white-and-blue colour photo measured 19.2 / 0.92, so keep a margin.)
     auto_tint_chroma_max: float = Field(15.0, alias="FORGE_AUTO_TINT_CHROMA_MAX")
     auto_tint_hue_min: float = Field(0.97, alias="FORGE_AUTO_TINT_HUE_MIN")
+    # The tint must also be warm — its hue angle (Lab a/b, degrees) in this
+    # range, the brown/yellow of sepia and toned prints. A neutral scene with a
+    # cool white-balance cast (snow read 313°) is a colour photo. And neither
+    # rule applies if at least this share of pixels is strongly coloured
+    # (chroma > 25): real colour somewhere (a UI icon read 0.3%; true sepia and
+    # black-and-white prints read 0).
+    auto_tint_angle_min: float = Field(20.0, alias="FORGE_AUTO_TINT_ANGLE_MIN")
+    auto_tint_angle_max: float = Field(110.0, alias="FORGE_AUTO_TINT_ANGLE_MAX")
+    auto_strong_color_min: float = Field(0.001, alias="FORGE_AUTO_STRONG_COLOR_MIN")
     # Restore faces (judged per photo, see suggest.face_plan): faces narrower
     # than `min` (source px) are ignored as too small to restore well; restore
     # when a remaining face is narrower than `small`, or softer than the

@@ -92,13 +92,13 @@ export function PhotoView({
     }
   }
 
-  // One line beside the switch; "suggested" is green like the suggestions.
+  // One line beside the switch; Auto's verdicts are green like the suggestions.
   const caption: { text: string; suggested?: boolean } | null =
     mode === 'auto'
       ? !done
         ? { text: 'Analyzing this photo…' }
         : nothingSelected
-          ? { text: 'This photo looks good as it is' }
+          ? { text: 'This photo looks good as it is', suggested: true }
           : { text: 'Suggested for this photo', suggested: true }
       : adjustedFromAuto
         ? { text: 'Adjusted from the suggestions' }

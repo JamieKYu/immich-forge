@@ -82,6 +82,8 @@ class Signals:
     lit_median: float           # median brightness of the remaining pixels
     chroma_p95: float
     hue_concentration: float
+    tint_hue: float               # dominant hue angle in Lab a/b, degrees 0-360
+    strong_color_fraction: float  # share of strongly coloured pixels (chroma > 25)
     faces: list[Face] | None    # None: face detection unavailable
 
     def metrics(self) -> dict[str, float]:
@@ -95,6 +97,8 @@ class Signals:
             "lit_median": self.lit_median,
             "chroma_p95": self.chroma_p95,
             "hue_concentration": self.hue_concentration,
+            "tint_hue": self.tint_hue,
+            "strong_color_fraction": self.strong_color_fraction,
         }
         if self.jpeg_quality is not None:
             out["jpeg_quality"] = self.jpeg_quality
@@ -245,13 +249,21 @@ def exposure(img: np.ndarray) -> tuple[float, float, float, float]:
     )
 
 
-def color_stats(img: np.ndarray) -> tuple[float, float]:
-    """(95th-percentile chroma, hue concentration).
+_STRONG_CHROMA = 25.0  # chroma above which a pixel is unmistakably coloured
+
+
+def color_stats(img: np.ndarray) -> tuple[float, float, float, float]:
+    """(95th-percentile chroma, hue concentration, dominant hue angle,
+    strongly coloured share).
 
     Chroma is the distance from neutral grey in Lab's a/b plane (0 for a true
     black-and-white image). Hue concentration is the chroma-weighted mean
     resultant length of the hue angles: near 1 when all the colour is one hue
-    (sepia, a cyanotype), lower for a normal colour photo.
+    (sepia, a cyanotype), lower for a normal colour photo. The dominant hue says
+    which way the tint leans: sepia and toned prints are warm (brown/yellow),
+    a white-balance cast on snow is cool. The strongly coloured share catches a
+    mostly neutral photo with some real colour in it (a coloured house, a UI
+    icon): a genuine sepia or black-and-white print has none.
 
     Chroma shrinks with lightness, so a dark colour photo would read as
     black-and-white. The copy is first scaled up so its highlights sit at a
@@ -271,10 +283,13 @@ def color_stats(img: np.ndarray) -> tuple[float, float]:
     chroma = np.hypot(a, b)
     total = float(chroma.sum())
     if total < 1e-6:
-        return 0.0, 1.0
+        return 0.0, 1.0, 0.0, 0.0
     # sum(chroma * unit hue vector) == sum of the (a, b) vectors themselves.
-    concentration = math.hypot(float(a.sum()), float(b.sum())) / total
-    return float(np.percentile(chroma, 95)), float(concentration)
+    sum_a, sum_b = float(a.sum()), float(b.sum())
+    concentration = math.hypot(sum_a, sum_b) / total
+    hue = math.degrees(math.atan2(sum_b, sum_a)) % 360.0
+    strong = float((chroma > _STRONG_CHROMA).mean())
+    return float(np.percentile(chroma, 95)), float(concentration), hue, strong
 
 
 def measure(
@@ -284,7 +299,7 @@ def measure(
 ) -> Signals:
     h, w = img.shape[:2]
     luma_median, luma_p95, black_fraction, lit_median = exposure(img)
-    chroma_p95, hue = color_stats(img)
+    chroma_p95, hue, tint_hue, strong = color_stats(img)
     return Signals(
         width=w,
         height=h,
@@ -298,6 +313,8 @@ def measure(
         lit_median=lit_median,
         chroma_p95=chroma_p95,
         hue_concentration=hue,
+        tint_hue=tint_hue,
+        strong_color_fraction=strong,
         faces=face_detector.detect(img) if face_detector else None,
     )
 
@@ -313,15 +330,20 @@ def decide(s: Signals, settings) -> Suggestion:
     def off_on_server(backend: str) -> bool:
         return backend == "none"
 
-    # Colorize: only black-and-white or single-tint photos. Colorizing a colour
-    # photo would replace its real colours.
-    if s.chroma_p95 <= settings.auto_gray_chroma_max:
+    # Colorize: only black-and-white or warm single-tint (sepia-toned) photos,
+    # with no real colour anywhere. Colorizing a colour photo would replace its
+    # real colours.
+    has_colour = s.strong_color_fraction >= settings.auto_strong_color_min
+    warm_tint = settings.auto_tint_angle_min <= s.tint_hue <= settings.auto_tint_angle_max
+    if not has_colour and s.chroma_p95 <= settings.auto_gray_chroma_max:
         ops.colorize, reasons["colorize"] = True, "black-and-white photo"
     elif (
-        s.chroma_p95 <= settings.auto_tint_chroma_max
+        not has_colour
+        and warm_tint
+        and s.chroma_p95 <= settings.auto_tint_chroma_max
         and s.hue_concentration >= settings.auto_tint_hue_min
     ):
-        ops.colorize, reasons["colorize"] = True, "single-tint photo (e.g. sepia)"
+        ops.colorize, reasons["colorize"] = True, "sepia-toned photo"
     else:
         reasons["colorize"] = "already in color"
     if ops.colorize and off_on_server(settings.colorize_backend):

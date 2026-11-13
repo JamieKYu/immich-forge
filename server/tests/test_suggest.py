@@ -139,30 +139,32 @@ def test_exposure_separates_black_background_from_lit_subject():
 
 def test_color_stats_grey_sepia_and_colour():
     grey = cv2.cvtColor(cv2.cvtColor(_gradient(), cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
-    chroma, _ = color_stats(grey)
+    chroma, *_ = color_stats(grey)
     assert chroma < 2
 
-    # Sepia: grey luminance with one warm tint.
+    # Sepia: grey luminance with one warm tint, about as strong as a real
+    # sepia print (which measured chroma 11.7, hue 74°).
     lum = cv2.cvtColor(_gradient(), cv2.COLOR_BGR2GRAY).astype(np.float32)
-    sepia = np.clip(np.stack([lum * 0.75, lum * 0.9, lum * 1.05], -1), 0, 255).astype(np.uint8)
-    chroma, concentration = color_stats(sepia)
-    assert 6 < chroma <= 20 and concentration > 0.95
+    sepia = np.clip(np.stack([lum * 0.83, lum * 0.92, lum * 1.03], -1), 0, 255).astype(np.uint8)
+    chroma, concentration, hue, strong = color_stats(sepia)
+    assert 6 < chroma <= 15 and concentration > 0.97
+    assert 20 <= hue <= 110 and strong == 0.0  # warm, nothing strongly coloured
 
     rng = np.random.default_rng(0)
     colourful = rng.integers(0, 256, size=(128, 128, 3), dtype=np.uint8)
-    chroma, concentration = color_stats(colourful)
-    assert chroma > 20 and concentration < 0.5
+    chroma, concentration, _, strong = color_stats(colourful)
+    assert chroma > 20 and concentration < 0.5 and strong > 0.1
 
 
 def test_dark_colour_photo_does_not_read_as_black_and_white():
     # An ordinary colour scene at ~10% exposure: unadjusted, its chroma falls
     # under the black-and-white cutoff.
     dark = (_gradient().astype(np.float32) * 0.1).astype(np.uint8)
-    chroma, _ = color_stats(dark)
+    chroma, *_ = color_stats(dark)
     assert chroma > 3 * _S.auto_gray_chroma_max
     # ...while a dark black-and-white photo still reads as one.
     grey = cv2.cvtColor(cv2.cvtColor(dark, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
-    chroma, _ = color_stats(grey)
+    chroma, *_ = color_stats(grey)
     assert chroma <= _S.auto_gray_chroma_max
 
 
@@ -182,7 +184,7 @@ def test_measure_combines_signals():
 _CLEAN = Signals(
     width=4000, height=3000, jpeg_quality=92.0, jpeg_blocking=0.2, noise_sigma=1.5,
     iso=100, luma_median=120.0, luma_p95=230.0, black_fraction=0.02, lit_median=125.0,
-    chroma_p95=45.0,
+    chroma_p95=45.0, tint_hue=200.0, strong_color_fraction=0.2,
     hue_concentration=0.3, faces=[],
 )
 _OPS = ("dejpeg", "denoise", "low_light", "upscale", "face_restore", "colorize")
@@ -256,19 +258,28 @@ def test_reduce_noise_on_noise_iso_or_brightening():
 
 
 def test_colorize_only_for_black_and_white_or_single_tint():
-    sug = decide(replace(_CLEAN, chroma_p95=2.0), _S)
+    neutral = replace(_CLEAN, strong_color_fraction=0.0)
+    sug = decide(replace(neutral, chroma_p95=2.0), _S)
     assert sug.operations.colorize and sug.reasons["colorize"] == "black-and-white photo"
-    assert "colorize" in _on(replace(_CLEAN, chroma_p95=12.0, hue_concentration=0.98))
+    sug = decide(replace(neutral, chroma_p95=12.0, hue_concentration=0.98, tint_hue=70.0), _S)
+    assert sug.operations.colorize and sug.reasons["colorize"] == "sepia-toned photo"
     # Muted colour photo: low chroma but mixed hues.
-    assert "colorize" not in _on(replace(_CLEAN, chroma_p95=12.0, hue_concentration=0.6))
+    assert "colorize" not in _on(replace(neutral, chroma_p95=12.0, hue_concentration=0.6, tint_hue=70.0))
+    # One-hued but cool (a white-balance cast), or with real colour somewhere.
+    assert "colorize" not in _on(replace(neutral, chroma_p95=12.0, hue_concentration=0.98, tint_hue=300.0))
+    assert "colorize" not in _on(replace(neutral, chroma_p95=2.0, strong_color_fraction=0.01))
 
 
 # Readings from real sample photos, with the owner's verdict.
 @pytest.mark.parametrize(
     ("name", "signals", "want"),
     [
-        ("sepia print", dict(chroma_p95=11.70, hue_concentration=0.99), {"colorize"}),
-        ("black-and-white scan", dict(chroma_p95=0.0, hue_concentration=1.0), {"colorize"}),
+        ("sepia print", dict(chroma_p95=11.70, hue_concentration=0.99, tint_hue=73.8, strong_color_fraction=0.0), {"colorize"}),
+        ("black-and-white scan", dict(chroma_p95=0.0, hue_concentration=1.0, tint_hue=0.0, strong_color_fraction=0.0), {"colorize"}),
+        # Beige-wall phone screenshot with a small yellow UI icon: real colour.
+        ("neutral screenshot with a coloured icon", dict(chroma_p95=9.22, hue_concentration=0.97, tint_hue=93.9, strong_color_fraction=0.003), set()),
+        # Snowy street: neutral with a cool white-balance cast, not a sepia tint.
+        ("snowy street, cool cast", dict(chroma_p95=12.04, hue_concentration=0.98, tint_hue=312.8, strong_color_fraction=0.0), set()),
         # Pale goat against blue sky: low chroma, fairly one-hued — still colour.
         ("pale colour photo", dict(chroma_p95=19.21, hue_concentration=0.92), set()),
         ("dark-mode screenshot", dict(chroma_p95=70.94, hue_concentration=0.96, luma_median=21.0, luma_p95=255.0), set()),
@@ -344,7 +355,7 @@ def test_options_turned_off_on_the_server_are_never_suggested():
         FORGE_DENOISE_BACKEND="none", FORGE_FACE_BACKEND="none",
     )
     needy = replace(
-        _CLEAN, jpeg_quality=20.0, chroma_p95=1.0, noise_sigma=12.0,
+        _CLEAN, jpeg_quality=20.0, chroma_p95=1.0, strong_color_fraction=0.0, noise_sigma=12.0,
         faces=[Face(width=80, sharpness=5)],
     )
     sug = decide(needy, off)
