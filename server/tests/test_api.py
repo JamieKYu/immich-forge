@@ -144,6 +144,22 @@ def test_analyze_passes_detailed_image(client):
     assert r.json()["low_quality"] is False
 
 
+def test_analyze_returns_auto_suggestions_with_reasons(client):
+    # A small black-and-white photo: Auto should suggest colorize and x4.
+    grey = np.tile(np.linspace(40, 220, 320, dtype=np.uint8), (240, 1))
+    app.state.immich = FakeImmich(original=_jpeg(cv2.cvtColor(grey, cv2.COLOR_GRAY2BGR)))
+    r = client.post("/analyze", headers=AUTH, json={"asset_id": "a1"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["suggested"]["colorize"] is True
+    assert body["suggested"]["upscale"] is True and body["suggested"]["upscale_factor"] == 4
+    assert set(body["reasons"]) == {
+        "dejpeg", "denoise", "low_light", "upscale", "face_restore", "colorize",
+    }
+    assert body["reasons"]["upscale"] == "320×240 source"
+    assert {"noise_sigma", "jpeg_quality", "chroma_p95"} <= set(body["metrics"])
+
+
 def test_analyze_400_on_undecodable_bytes(client):
     app.state.immich = FakeImmich(original=b"not an image")
     r = client.post("/analyze", headers=AUTH, json={"asset_id": "a1"})

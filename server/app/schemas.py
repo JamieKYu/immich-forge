@@ -62,12 +62,19 @@ class ForgeRequest(BaseModel):
 class ForgeAnalysis(BaseModel):
     """Result of the pre-submit source-quality precheck (see pipeline/quality.py).
 
-    `low_quality` is the only field the UI acts on — it drives a generic, soft,
-    non-blocking "results may be limited" note. `metrics` carries the raw scores
-    for debugging/tuning."""
+    `low_quality` drives a generic, soft, non-blocking "results may be limited"
+    note. `suggested` / `reasons` are Auto mode (see pipeline/suggest.py): the
+    enhancements this photo probably needs, and a short user-facing reason for
+    each option, keyed by operation field (on or off, e.g. "640×480 source",
+    "already in color"). `metrics` carries the raw measurements for
+    debugging/tuning.
+
+    Older servers omit `suggested`; clients treat that as "no Auto mode"."""
 
     low_quality: bool
     metrics: dict[str, float] = {}
+    suggested: ForgeOperations | None = None
+    reasons: dict[str, str] = {}
 
 
 class JobInfo(BaseModel):

@@ -37,6 +37,7 @@ FORGE_API_TOKEN=dev-token FORGE_DEVICE=cpu FORGE_UPSCALE_BACKEND=lanczos \
 |--------|------|---------|
 | GET  | `/health` | liveness + Immich connectivity + GPU status |
 | GET  | `/models` | active backends |
+| POST | `/analyze` | quality precheck + Auto-mode suggestions `{asset_id}` (CPU only) |
 | POST | `/forge` | submit a job `{asset_id, operations}` → `{job_id}` |
 | GET  | `/forge/{id}` | status / progress |
 | GET  | `/forge/{id}/result` | forged image bytes |
@@ -87,6 +88,51 @@ upscale). Both are tiled.
 A single GPU semaphore serializes jobs, the CUDA cache is freed between stages,
 and the upscale factor is clamped so output stays under `FORGE_MAX_OUTPUT_PIXELS`
 (default 100MP) — e.g. a 19MP source requested at ×4 is clamped to ×2.
+
+## Auto-mode suggestions
+
+`/analyze` suggests which enhancements a photo probably needs, with a short
+reason for every option, on or off. The extension's Auto mode shows these.
+
+```json
+{
+  "low_quality": true,
+  "suggested": { "dejpeg": true, "upscale": true, "upscale_factor": 4, "colorize": true, "...": "..." },
+  "reasons": {
+    "dejpeg": "heavily compressed (JPEG quality ≈20)",
+    "upscale": "800×600 source",
+    "colorize": "black-and-white photo",
+    "face_restore": "no faces found",
+    "...": "..."
+  },
+  "metrics": { "jpeg_quality": 20.0, "noise_sigma": 0.4, "chroma_p95": 0.0, "...": 0 }
+}
+```
+
+| Option | Suggested when (defaults) |
+|--------|---------------------------|
+| JPEG cleanup | estimated JPEG quality < 60 (from the file's quantization tables), or a visible 8×8 block-edge step ≥ 2 grey levels |
+| Reduce noise | estimated noise σ ≥ 8 (0–255), camera ISO ≥ 3200, or σ ≥ 4.8 when Brighten is also suggested |
+| Brighten | median brightness ≤ 60 and 95th percentile ≤ 190 (a silhouette against a bright sky isn't "dark") |
+| Enlarge | ×4 up to 1200 px on the long side, ×2 up to 2500 px, within `FORGE_MAX_OUTPUT_PIXELS` |
+| Restore faces | a face 80–200 px wide, or soft — unless the largest face is itself over 200 px and sharp (softer faces are then likely background blur). Faces under 80 px are ignored as too small to restore well |
+| Colorize | black-and-white (95th-percentile chroma ≤ 6), or a single tint such as sepia (chroma ≤ 15 and hue concentration ≥ 0.97) |
+
+It's all CPU work (about 0.2 s for a 24 MP photo, plus face detection), so it
+never waits on the GPU while a job runs. Face detection uses facexlib's
+RetinaFace on the CPU and loads only if `detection_Resnet50_Final.pth` is
+already in the weights folder (`download_weights.py` fetches it); otherwise the
+reason reads "face detection unavailable". Options whose backend is `none` are
+never suggested.
+
+The cutoffs lean conservative for JPEG cleanup and face restoration, whose
+false positives cost the most (softening a clean photo, changing how someone
+looks). They're tunable with the `FORGE_AUTO_*` settings in `app/config.py`. To
+see what Auto would pick for your own photos, with the raw numbers:
+
+```bash
+python scripts/suggest_report.py --metrics ~/Pictures/scans
+```
 
 ## Models
 
