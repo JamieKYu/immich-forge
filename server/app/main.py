@@ -3,7 +3,7 @@
 Endpoints:
   GET  /health                  liveness + Immich connectivity + GPU status
   GET  /models                  which backends/weights are active
-  POST /analyze                 pre-submit source-quality precheck (CPU-only)
+  POST /analyze                 quality precheck + Auto-mode suggestions (CPU-only)
   POST /forge                   submit a forge job  -> {job_id}
   GET  /forge/{job_id}          job status / progress
   GET  /forge/{job_id}/result   the forged image bytes (when done)
@@ -30,6 +30,7 @@ from .immich import ImmichClient, ImmichError
 from .jobs import JobManager
 from .pipeline import Pipeline
 from .pipeline.quality import assess_quality
+from .pipeline.suggest import FaceDetector, decide, measure
 from .schemas import AcceptResponse, ForgeAnalysis, ForgeRequest, JobInfo
 
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +48,8 @@ async def lifespan(app: FastAPI):
     app.state.immich = immich
     app.state.pipeline = pipeline
     app.state.jobs = jobs
+    # CPU face detector for Auto-mode suggestions (loads lazily on first use).
+    app.state.face_detector = FaceDetector(settings.weights_dir, settings.auto_face_detection)
     log.info("forge ready (device=%s)", settings.device)
     try:
         yield
@@ -113,10 +116,11 @@ async def models(request: Request, _: None = Depends(require_token)):
 
 @app.post("/analyze", response_model=ForgeAnalysis)
 async def analyze(req: ForgeRequest, request: Request, _: None = Depends(require_token)):
-    """Cheap source-quality precheck the extension runs before offering Forge, so
-    it can warn when a low-quality original means results will be limited. Pure
-    CPU (no GPU, no model weights) — it never touches the pipeline semaphore, so
-    it stays responsive even while a forge job is running."""
+    """Pre-submit check the extension runs on the photo screen: a source-quality
+    verdict (warn when a low-quality original means results will be limited)
+    plus Auto-mode suggestions with reasons. CPU only (face detection included)
+    — it never touches the pipeline semaphore, so it stays responsive even while
+    a forge job is running."""
     immich: ImmichClient = request.app.state.immich
     settings = request.app.state.settings
     try:
@@ -126,9 +130,13 @@ async def analyze(req: ForgeRequest, request: Request, _: None = Depends(require
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"cannot reach Immich: {exc!r}")
 
+    face_detector = getattr(request.app.state, "face_detector", None)
+
     def _assess() -> ForgeAnalysis:
         img = Pipeline.decode(data)  # raises ValueError on undecodable bytes
         report = assess_quality(img, settings)
+        signals = measure(img, data, face_detector)
+        suggestion = decide(signals, settings)
         return ForgeAnalysis(
             low_quality=report.low_quality,
             metrics={
@@ -137,7 +145,10 @@ async def analyze(req: ForgeRequest, request: Request, _: None = Depends(require
                 "blockiness": report.blockiness,
                 "width": float(report.width),
                 "height": float(report.height),
+                **signals.metrics(),
             },
+            suggested=suggestion.operations,
+            reasons=suggestion.reasons,
         )
 
     try:
