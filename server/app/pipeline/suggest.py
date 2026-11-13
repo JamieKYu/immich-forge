@@ -78,6 +78,8 @@ class Signals:
     iso: int | None
     luma_median: float
     luma_p95: float
+    black_fraction: float       # share of near-black pixels (<= 20 of 255)
+    lit_median: float           # median brightness of the remaining pixels
     chroma_p95: float
     hue_concentration: float
     faces: list[Face] | None    # None: face detection unavailable
@@ -89,6 +91,8 @@ class Signals:
             "noise_sigma": self.noise_sigma,
             "luma_median": self.luma_median,
             "luma_p95": self.luma_p95,
+            "black_fraction": self.black_fraction,
+            "lit_median": self.lit_median,
             "chroma_p95": self.chroma_p95,
             "hue_concentration": self.hue_concentration,
         }
@@ -221,10 +225,24 @@ def jpeg_blocking(img: np.ndarray) -> float:
     return max(0.0, (axis_step(across_cols) + axis_step(across_rows)) / 2.0)
 
 
-def exposure(img: np.ndarray) -> tuple[float, float]:
-    """(median, 95th percentile) brightness, 0-255."""
+_NEAR_BLACK = 20  # grey level at or below which a pixel counts as black
+
+
+def exposure(img: np.ndarray) -> tuple[float, float, float, float]:
+    """(median, 95th percentile, near-black share, median of the rest), 0-255.
+
+    The last two tell a lit subject against a black background (a flash or
+    torch-lit photo at night or in a cave: mostly black, the rest properly
+    exposed) from a dim scene (the lit parts are dark too)."""
     gray = cv2.cvtColor(_work_copy(img), cv2.COLOR_BGR2GRAY)
-    return float(np.median(gray)), float(np.percentile(gray, 95))
+    black = gray <= _NEAR_BLACK
+    lit = gray[~black]
+    return (
+        float(np.median(gray)),
+        float(np.percentile(gray, 95)),
+        float(black.mean()),
+        float(np.median(lit)) if lit.size else 0.0,
+    )
 
 
 def color_stats(img: np.ndarray) -> tuple[float, float]:
@@ -265,7 +283,7 @@ def measure(
     face_detector: "FaceDetector | None" = None,
 ) -> Signals:
     h, w = img.shape[:2]
-    luma_median, luma_p95 = exposure(img)
+    luma_median, luma_p95, black_fraction, lit_median = exposure(img)
     chroma_p95, hue = color_stats(img)
     return Signals(
         width=w,
@@ -276,6 +294,8 @@ def measure(
         iso=read_iso(data),
         luma_median=luma_median,
         luma_p95=luma_p95,
+        black_fraction=black_fraction,
+        lit_median=lit_median,
         chroma_p95=chroma_p95,
         hue_concentration=hue,
         faces=face_detector.detect(img) if face_detector else None,
@@ -335,8 +355,16 @@ def decide(s: Signals, settings) -> Suggestion:
         ops.dejpeg, reasons["dejpeg"] = False, "turned off on this server"
 
     # Brighten: dark overall, without bright highlights (a silhouette against a
-    # bright sky isn't underexposed).
-    if s.luma_median <= settings.auto_dark_median_max and s.luma_p95 <= settings.auto_dark_p95_max:
+    # bright sky isn't underexposed) — and not a lit subject against a black
+    # background, where brightening only turns the black into grey murk.
+    dark = s.luma_median <= settings.auto_dark_median_max and s.luma_p95 <= settings.auto_dark_p95_max
+    lit_subject = (
+        s.black_fraction >= settings.auto_black_background_min
+        and s.lit_median >= settings.auto_lit_subject_min
+    )
+    if dark and lit_subject:
+        reasons["low_light"] = "dark background, subject well lit"
+    elif dark:
         ops.low_light = True
         reasons["low_light"] = f"underexposed (median brightness {s.luma_median / 2.55:.0f}%)"
     else:

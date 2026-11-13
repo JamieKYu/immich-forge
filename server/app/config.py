@@ -87,6 +87,14 @@ class Settings(BaseSettings):
     # at or below the next (so a silhouette against a bright sky isn't "dark").
     auto_dark_median_max: float = Field(60.0, alias="FORGE_AUTO_DARK_MEDIAN_MAX")
     auto_dark_p95_max: float = Field(190.0, alias="FORGE_AUTO_DARK_P95_MAX")
+    # ...but not when at least this share of the photo is near-black and the
+    # rest has a median brightness of at least the next: a flash- or torch-lit
+    # subject against a black background, where the darkness is the scene.
+    # (Calibrated: such photos read 58-74% black / 60-82 lit; dim rooms and
+    # concerts that did want brightening read 28-47% black, or 93% black with
+    # the lit parts at 27.)
+    auto_black_background_min: float = Field(0.52, alias="FORGE_AUTO_BLACK_BACKGROUND_MIN")
+    auto_lit_subject_min: float = Field(45.0, alias="FORGE_AUTO_LIT_SUBJECT_MIN")
     # Colorize: black-and-white when the 95th-percentile chroma (Lab) is at
     # most `gray`, or a single-hue tint (sepia) when chroma is at most `tint`
     # and the hue concentration (0-1) is at least the last. Conservative:

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   describeOperations,
   stageLabel,
+  suggestedOperations,
   toRequest,
   unavailableReason,
   withoutUnavailable,
@@ -27,6 +28,20 @@ describe('toRequest', () => {
   it('leaves denoise-only untouched', () => {
     const o = ops({ denoise: true, denoise_strength: 0.4 })
     expect(toRequest(o)).toEqual(o)
+  })
+})
+
+describe('suggestedOperations', () => {
+  it('is null when the server returned no suggestions (older server)', () => {
+    expect(suggestedOperations(null)).toBeNull()
+    expect(suggestedOperations({ low_quality: false, metrics: {} })).toBeNull()
+    expect(suggestedOperations({ low_quality: false, metrics: {}, suggested: null })).toBeNull()
+  })
+
+  it('fills any fields the server left out from the defaults', () => {
+    const partial = { colorize: true } as unknown as ForgeOperations
+    const ops = suggestedOperations({ low_quality: false, metrics: {}, suggested: partial })
+    expect(ops).toEqual({ ...DEFAULT_OPERATIONS, colorize: true })
   })
 })
 

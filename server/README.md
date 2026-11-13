@@ -113,7 +113,7 @@ reason for every option, on or off. The extension's Auto mode shows these.
 |--------|---------------------------|
 | JPEG cleanup | estimated JPEG quality < 60 (from the file's quantization tables), or a visible 8×8 block-edge step ≥ 2 grey levels |
 | Reduce noise | estimated noise σ ≥ 8 (0–255), camera ISO ≥ 3200, or σ ≥ 4.8 when Brighten is also suggested |
-| Brighten | median brightness ≤ 60 and 95th percentile ≤ 190 (a silhouette against a bright sky isn't "dark") |
+| Brighten | median brightness ≤ 60 and 95th percentile ≤ 190 (a silhouette against a bright sky isn't "dark"), except a lit subject on a black background: ≥ 52% near-black with the rest at median ≥ 45 (flash or torch-lit photos at night) |
 | Enlarge | ×4 up to 1200 px on the long side, ×2 up to 2500 px, within `FORGE_MAX_OUTPUT_PIXELS` |
 | Restore faces | a face 80–200 px wide, or soft — unless the largest face is itself over 200 px and sharp (softer faces are then likely background blur). Faces under 80 px are ignored as too small to restore well |
 | Colorize | black-and-white (95th-percentile chroma ≤ 6), or a single tint such as sepia (chroma ≤ 15 and hue concentration ≥ 0.97) |

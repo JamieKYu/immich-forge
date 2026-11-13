@@ -23,7 +23,8 @@ export class HttpError extends Error {
 }
 
 export class ForgeClient {
-  constructor(private settings: Settings) {}
+  // Only the connection details are needed.
+  constructor(private settings: Pick<Settings, 'forgeUrl' | 'forgeToken'>) {}
 
   private get base() {
     return this.settings.forgeUrl.replace(/\/$/, '')

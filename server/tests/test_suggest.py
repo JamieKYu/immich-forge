@@ -125,8 +125,16 @@ def test_jpeg_blocking_survives_a_high_quality_resave():
 
 def test_exposure_reports_median_and_p95():
     dark = np.full((100, 100, 3), 30, np.uint8)
-    median, p95 = exposure(dark)
+    median, p95, black, lit = exposure(dark)
     assert median == pytest.approx(30, abs=1) and p95 == pytest.approx(30, abs=1)
+    assert black == 0.0 and lit == pytest.approx(30, abs=1)
+
+
+def test_exposure_separates_black_background_from_lit_subject():
+    img = np.zeros((100, 100, 3), np.uint8)
+    img[30:70, 40:60] = 120  # a lit subject on black
+    _, _, black, lit = exposure(img)
+    assert black == pytest.approx(0.92, abs=0.01) and lit == pytest.approx(120, abs=1)
 
 
 def test_color_stats_grey_sepia_and_colour():
@@ -173,7 +181,8 @@ def test_measure_combines_signals():
 # A clean, large colour photo with no faces: nothing should be suggested.
 _CLEAN = Signals(
     width=4000, height=3000, jpeg_quality=92.0, jpeg_blocking=0.2, noise_sigma=1.5,
-    iso=100, luma_median=120.0, luma_p95=230.0, chroma_p95=45.0,
+    iso=100, luma_median=120.0, luma_p95=230.0, black_fraction=0.02, lit_median=125.0,
+    chroma_p95=45.0,
     hue_concentration=0.3, faces=[],
 )
 _OPS = ("dejpeg", "denoise", "low_light", "upscale", "face_restore", "colorize")
@@ -225,6 +234,14 @@ def test_brighten_needs_dark_midtones_and_no_bright_highlights():
     assert "low_light" not in _on(replace(_CLEAN, luma_median=30.0, luma_p95=250.0))
 
 
+def test_lit_subject_on_black_background_is_not_brightened():
+    sug = decide(
+        replace(_CLEAN, luma_median=5.0, luma_p95=150.0, black_fraction=0.7, lit_median=80.0), _S
+    )
+    assert not sug.operations.low_light
+    assert sug.reasons["low_light"] == "dark background, subject well lit"
+
+
 def test_reduce_noise_on_noise_iso_or_brightening():
     sug = decide(replace(_CLEAN, noise_sigma=10.0), _S)
     assert sug.operations.denoise and sug.reasons["denoise"] == "visible grain or noise"
@@ -258,6 +275,13 @@ def test_colorize_only_for_black_and_white_or_single_tint():
         # Fine film grain the owner didn't consider worth removing.
         ("old scan with grain", dict(noise_sigma=6.38), set()),
         ("small web image", dict(noise_sigma=4.13), set()),
+        # Flash/torch-lit people against a black cave or night: leave dark.
+        ("lit family in a cave", dict(luma_median=2.0, luma_p95=157.0, black_fraction=0.737, lit_median=82.0), set()),
+        ("flash group at night", dict(luma_median=12.0, luma_p95=138.0, black_fraction=0.581, lit_median=60.0), set()),
+        # Genuinely dim scenes the owner wanted brightened.
+        ("dim room", dict(luma_median=22.0, luma_p95=169.0, black_fraction=0.473, lit_median=140.0), {"low_light"}),
+        ("dark concert", dict(luma_median=4.0, luma_p95=24.0, black_fraction=0.929, lit_median=27.0), {"low_light"}),
+        ("lamp-lit living room", dict(luma_median=53.0, luma_p95=168.0, black_fraction=0.28, lit_median=79.0), {"low_light"}),
         # Two photos saved at quality ~72: one with visible damage from an
         # earlier save, one clean. Indistinguishable by every measure, so both
         # are left alone rather than soften the clean one.
