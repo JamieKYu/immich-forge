@@ -20,6 +20,7 @@
   section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
   h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   h2 .meta { font-size: 12px; font-weight: 400; color: var(--muted); }
+  h2 .meta.ready { color: var(--ok); }
   label { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 12px; }
   input { width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
   input[readonly] { color: var(--muted); }
@@ -110,12 +111,10 @@
     <form id="immich-form">
       <label for="url">Immich address</label>
       <input id="url" placeholder="http://192.168.1.50:2283" required>
-      <p class="muted small" style="margin:4px 0 0">Use the computer's IP address, not <code>localhost</code>.</p>
 
       <label for="key">Immich API key</label>
       <input id="key" type="password" autocomplete="off">
-      <p class="muted small" style="margin:4px 0 0" id="key-help">
-        In Immich: your avatar → Account Settings → API Keys → New API Key.</p>
+      <p class="muted small" style="margin:4px 0 0" id="key-help" hidden></p>
 
       <p class="msg" id="immich-msg" hidden></p>
       <div class="row">
@@ -129,7 +128,7 @@
   <!-- Forge token: paste your own, copy, or generate any time -->
   <section id="token" hidden>
     <h2>Forge token <span class="meta" id="token-meta"></span></h2>
-    <p class="muted small" id="token-intro">The Forge extension uses this to sign in to this server.</p>
+    <p class="muted small" id="token-intro">The Forge for Immich Chrome extension uses this to sign in to this server.</p>
     <form id="token-form">
       <label for="token-input">Token</label>
       <div class="token-wrap">
@@ -153,7 +152,8 @@
       <li>Install <a href="https://chromewebstore.google.com/detail/forge-for-immich/ceaoooljelkcaagcljambkdldadpblgc" target="_blank" rel="noopener">Forge for Immich</a> from the Chrome Web Store.</li>
       <li>Click the Forge toolbar icon → <b>Set up Forge server</b>.</li>
       <li>Server address: <code id="server-address"></code></li>
-      <li>API token: your Forge token above. Then <b>Save &amp; test</b>.</li>
+      <li>API token: your Forge token above.</li>
+      <li>Click <b>Save &amp; test</b>.</li>
     </ol>
   </section>
 </main>
@@ -226,12 +226,13 @@ function gb(bytes) {
 function renderModels(m) {
   const pct = m.total_bytes ? Math.round((100 * m.done_bytes) / m.total_bytes) : 0;
   const meta = {
-    ready: 'All models ready ✓',
+    ready: 'ready',
     downloading: `Downloading · ${gb(m.done_bytes)} / ${gb(m.total_bytes)} · ${pct}%`,
     failed: 'Some downloads failed',
     skipped: 'Downloads turned off (FORGE_SKIP_WEIGHT_DOWNLOAD)',
   }[m.state] || m.state;
   $('models-meta').textContent = meta;
+  $('models-meta').classList.toggle('ready', m.state === 'ready');
   $('models-bar').firstElementChild.style.width = `${m.state === 'ready' ? 100 : pct}%`;
   $('models-bar').classList.toggle('done', m.state === 'ready');
   $('models-files').innerHTML = '';
@@ -360,7 +361,8 @@ $('signout').onclick = () => { remember(''); route(); };
 
 function renderImmich() {
   const saved = status.immich_configured;
-  $('immich-meta').textContent = saved ? 'saved' : '';
+  $('immich-meta').textContent = saved ? 'ready' : '';
+  $('immich-meta').classList.toggle('ready', saved);
   show('immich-intro', !saved);
   $('url').value = config.immich_base_url || $('url').value;
   const urlFromEnv = config.from_env.immich_base_url;
@@ -375,7 +377,8 @@ function renderImmich() {
   const fromEnv = [urlFromEnv && 'address', keyFromEnv && 'API key'].filter(Boolean);
   $('key-help').textContent = fromEnv.length
     ? `The ${fromEnv.join(' and ')} ${fromEnv.length > 1 ? 'are' : 'is'} set by the container (environment variables) and can't be changed here.`
-    : 'In Immich: your avatar → Account Settings → API Keys → New API Key.';
+    : '';
+  show('key-help', fromEnv.length > 0);
   $('save-btn').textContent = saved ? 'Save changes' : 'Save';
   $('save-btn').disabled = urlFromEnv && keyFromEnv;
   show('save-anyway-btn', false);
@@ -418,7 +421,8 @@ $('save-anyway-btn').onclick = () => saveImmich(true);
 
 function renderToken() {
   const envToken = config.from_env.forge_api_token;
-  $('token-meta').textContent = token ? 'saved' : '';
+  $('token-meta').textContent = token ? 'ready' : '';
+  $('token-meta').classList.toggle('ready', !!token);
   $('token-input').value = token;
   $('token-input').readOnly = envToken;
   $('token-input').type = 'password';
