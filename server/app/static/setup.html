@@ -14,7 +14,9 @@
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans-serif; }
   main { max-width: 600px; margin: 0 auto; padding: 32px 20px 64px; }
   h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 22px; }
+  .sub { color: var(--muted); margin: 0; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 22px; }
+  .top .link { margin-top: 4px; }
   section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
   h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   h2 .meta { font-size: 12px; font-weight: 400; color: var(--muted); }
@@ -50,11 +52,16 @@
 </head>
 <body>
 <main>
-  <h1>Forge for Immich</h1>
-  <p class="sub" id="subtitle">Server setup</p>
+  <header class="top">
+    <div>
+      <h1>Forge for Immich</h1>
+      <p class="sub">Server setup</p>
+    </div>
+    <button class="link" id="signout" hidden>Sign out</button>
+  </header>
 
   <!-- Model downloads: always visible -->
-  <section id="models">
+  <section id="models" hidden>
     <h2>AI models <span class="meta" id="models-meta">…</span></h2>
     <div class="bar" id="models-bar"><div style="width:0"></div></div>
     <ul class="files" id="models-files"></ul>
@@ -148,7 +155,6 @@
       <li>Server address: <code id="server-address"></code></li>
       <li>API token: your Forge token above. Then <b>Save &amp; test</b>.</li>
     </ol>
-    <div class="row" id="signout-row"><button class="link" id="signout">Sign out of this page</button></div>
   </section>
 </main>
 
@@ -274,7 +280,7 @@ $('retry-btn').onclick = async () => {
 
 async function route() {
   if (!(await pollStatus())) return;
-  for (const id of ['signin', 'immich', 'token', 'extension']) show(id, false);
+  for (const id of ['signin', 'models', 'immich', 'token', 'extension', 'signout']) show(id, false);
 
   if (status.token_set && !token) { showSignIn(); return; }
   if (status.token_set) {
@@ -292,14 +298,10 @@ async function route() {
   // First run starts with just the Immich connection; the token section
   // appears once there's a token (created when Immich is saved).
   const firstRun = !status.token_set
-  $('subtitle').textContent = !status.token_set && !status.immich_configured
-    ? 'Welcome! Connect Forge to your Immich server to get started.'
-    : status.setup_required
-      ? 'Almost there — finish the steps below.'
-      : 'Forge is set up. You can change its settings here any time.';
   renderImmich();
   $('server-address').textContent = location.origin;
-  show('signout-row', !!token);
+  show('signout', !!token);
+  show('models');
   show('immich');
   if (!firstRun) {
     renderToken();
@@ -310,7 +312,7 @@ async function route() {
 // --- sign in ------------------------------------------------------------------
 
 function showSignIn() {
-  $('subtitle').textContent = 'Server setup';
+  // Signed out: nothing but the sign-in form (no model progress either).
   // Immich sign-in needs a saved connection; otherwise only the token works.
   signInWith(status.immich_configured ? 'immich' : 'token');
   show('use-immich', status.immich_configured);
