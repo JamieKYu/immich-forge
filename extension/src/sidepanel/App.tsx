@@ -104,7 +104,14 @@ export function App() {
       {client && access && connection && !connection.ok && (
         <div className="banner">
           <span>{connection.message}</span>
-          <button onClick={openOptions}>Fix in settings</button>
+          {connection.kind === 'setup-required' ? (
+            // The fix is on the server's own setup page, not in the extension.
+            <button onClick={() => void chrome.tabs.create({ url: forgeUrl })}>
+              Open server setup
+            </button>
+          ) : (
+            <button onClick={openOptions}>Fix in settings</button>
+          )}
         </div>
       )}
       <main>{body}</main>
@@ -117,7 +124,9 @@ function ConnectionStatus({ connection }: { connection: ConnectionResult | null 
   const [cls, text] = !connection.ok
     ? connection.kind === 'unreachable'
       ? ['bad', 'server offline']
-      : ['bad', 'not connected']
+      : connection.kind === 'setup-required'
+        ? ['warn', 'server not set up']
+        : ['bad', 'not connected']
     : connection.immich
       ? ['ok', 'connected']
       : ['warn', 'Immich unreachable']

@@ -43,6 +43,15 @@ describe('testConnection', () => {
     })
   })
 
+  it('sends a fresh server to its setup page', async () => {
+    fetchMock.mockResolvedValueOnce(response(200, { ok: true, immich: false, setup_required: true }))
+    expect(await testConnection('http://h:8000', '')).toMatchObject({
+      ok: false,
+      kind: 'setup-required',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1) // no token check needed
+  })
+
   it('reports a rejected token', async () => {
     fetchMock
       .mockResolvedValueOnce(response(200, { ok: true, immich: true }))

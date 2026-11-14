@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import app
 from app.schemas import JobStatus
+from app.setup_config import SetupConfig
 
 AUTH = {"Authorization": "Bearer secret-token"}
 
@@ -56,13 +57,28 @@ class FakeJobs:
         return self._jobs.get(job_id)
 
 
-def _settings(token="secret-token") -> Settings:
-    return Settings(FORGE_API_TOKEN=token, IMMICH_API_KEY="k", FORGE_DEVICE="cpu")
+class ReadyDownloader:
+    """Stands in for ModelDownloader: every model present."""
+
+    ready_to_forge = True
+
+    def status(self):
+        return {"state": "ready", "done_bytes": 1, "total_bytes": 1, "files": []}
+
+
+def _settings(tmp_path, token="secret-token") -> Settings:
+    # Connection settings as environment values; weights dir isolated per test.
+    return Settings(
+        FORGE_API_TOKEN=token, IMMICH_BASE_URL="http://immich:2283", IMMICH_API_KEY="k",
+        FORGE_DEVICE="cpu", FORGE_WEIGHTS_DIR=str(tmp_path),
+    )
 
 
 @pytest.fixture
-def client():
-    app.state.settings = _settings()
+def client(tmp_path):
+    app.state.settings = _settings(tmp_path)
+    app.state.setup = SetupConfig(app.state.settings)
+    app.state.downloader = ReadyDownloader()
     app.state.immich = FakeImmich()
     app.state.jobs = FakeJobs()
     return TestClient(app)
@@ -85,11 +101,12 @@ def test_models_accepts_correct_token(client):
     assert set(r.json()) == {"dejpeg", "denoise", "upscale", "face", "colorize", "low_light"}
 
 
-def test_api_disabled_when_token_unset(client):
+def test_api_disabled_when_token_unset(client, tmp_path):
     # Fail closed: an unconfigured server must not serve the proxy at all.
-    app.state.settings = _settings(token="")
+    app.state.setup = SetupConfig(_settings(tmp_path, token=""))
     r = client.get("/models", headers=AUTH)
     assert r.status_code == 503
+    assert "setup required" in r.json()["detail"]
 
 
 def test_health_needs_no_token(client):

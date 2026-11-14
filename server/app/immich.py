@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 
 import httpx
 
-from .config import Settings
 
 
 class ImmichError(RuntimeError):
@@ -20,9 +19,11 @@ class ImmichError(RuntimeError):
 class ImmichClient:
     DEVICE_ID = "immich-forge"
 
-    def __init__(self, settings: Settings):
-        self._base = settings.immich_base_url.rstrip("/")
-        self._headers = settings.immich_headers
+    def __init__(self, conn):
+        # `conn`: anything with `immich_base_url` and `immich_headers` (Settings,
+        # or setup_config.Connection).
+        self._base = conn.immich_base_url.rstrip("/")
+        self._headers = conn.immich_headers
         self._client = httpx.AsyncClient(base_url=self._base, timeout=60.0)
 
     async def aclose(self) -> None:
@@ -96,3 +97,40 @@ class ImmichClient:
         if r.status_code not in (200, 201):
             raise ImmichError(f"create_stack failed: {r.status_code} {r.text}")
         return r.json()["id"]
+
+
+async def check_connection(base_url: str, api_key: str) -> dict:
+    """Test an Immich address and API key for the setup page.
+
+    Returns {"ok": True, "user": name} or {"ok": False, "kind": ..., "message":
+    ...}, telling apart a bad address, something that isn't Immich, and a key
+    that's wrong or lacks permission."""
+    base = base_url.strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        return {"ok": False, "kind": "invalid-url",
+                "message": "Enter the full address, e.g. http://192.168.1.50:2283"}
+    async with httpx.AsyncClient(base_url=base, timeout=10.0) as client:
+        try:
+            ping = await client.get("/api/server/ping")
+        except httpx.HTTPError as exc:
+            return {"ok": False, "kind": "unreachable",
+                    "message": f"Can't reach {base} ({type(exc).__name__}). Check the address and "
+                               "that Forge can reach it — use the IP address, not localhost."}
+        if ping.status_code != 200:
+            return {"ok": False, "kind": "not-immich",
+                    "message": f"{base} answered, but doesn't look like Immich (HTTP {ping.status_code})."}
+        if not api_key:
+            return {"ok": False, "kind": "no-key", "message": "Enter an Immich API key."}
+        try:
+            me = await client.get("/api/users/me", headers={"x-api-key": api_key.strip()})
+        except httpx.HTTPError as exc:
+            return {"ok": False, "kind": "unreachable", "message": f"Immich stopped answering ({type(exc).__name__})."}
+    if me.status_code == 401:
+        return {"ok": False, "kind": "bad-key", "message": "Immich rejected this API key."}
+    if me.status_code == 403:
+        return {"ok": False, "kind": "no-permission",
+                "message": "This API key doesn't have enough permissions. Create one with all permissions."}
+    if me.status_code != 200:
+        return {"ok": False, "kind": "error", "message": f"Immich returned HTTP {me.status_code}."}
+    user = me.json()
+    return {"ok": True, "user": user.get("name") or user.get("email") or "your account"}

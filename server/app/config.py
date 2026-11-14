@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="", extra="ignore")
 
     # --- Immich (the broker holds these; the browser never sees them) ---
+    # Optional: the setup page at / saves these (and the Forge token) instead.
+    # When set here they win, and show on the page as read-only.
     immich_base_url: str = Field("http://immich-server:2283", alias="IMMICH_BASE_URL")
     immich_api_key: str = Field("", alias="IMMICH_API_KEY")
 
@@ -29,6 +31,9 @@ class Settings(BaseSettings):
     # --- GPU / pipeline ---
     device: str = Field("cuda", alias="FORGE_DEVICE")  # "cuda" | "cpu"
     weights_dir: Path = Field(Path("weights"), alias="FORGE_WEIGHTS_DIR")
+    # Don't download missing model weights at start (offline hosts with a
+    # pre-filled weights volume). Forging then doesn't wait for downloads.
+    skip_weight_download: bool = Field(False, alias="FORGE_SKIP_WEIGHT_DOWNLOAD")
     max_image_pixels: int = Field(40_000_000, alias="FORGE_MAX_IMAGE_PIXELS")
     # Cap on the upscaled output; the upscale factor is clamped down to fit. Stops
     # a large source + x4 from producing a ~300MP image that OOMs the GPU.

@@ -12,14 +12,24 @@ without an NVIDIA GPU, see the platform steps in [`DOCKERHUB.md`](DOCKERHUB.md)
 (`--platform linux/amd64` + `FORGE_DEVICE=cpu`).
 
 ```bash
-cp .env.example .env        # set IMMICH_BASE_URL, IMMICH_API_KEY, FORGE_API_TOKEN
+cp .env.example .env        # optional settings (GPU, backends); no credentials needed
 docker compose up --build
 ```
 
-On first boot the container downloads the model weights into the mounted
-`weights/` volume (idempotent — subsequent starts are instant). Set
-`FORGE_SKIP_WEIGHT_DOWNLOAD=1` to bypass this and pre-populate `weights/`
-yourself (e.g. air-gapped hosts).
+Then open `http://<host>:8000`. The **setup page** connects Immich (address +
+API key, with a connection test) and creates the Forge token, saved to
+`weights/forge-settings.json` (mode 600) and applied without a restart. Come back
+to change them or make a new token; sign in with the token. Values set as
+environment variables win and show as read-only. Setup is "first visitor":
+until a token exists, anyone who reaches the page can complete it. Lost the
+token? `docker exec <container> python -m app.reset_token` prints a new one.
+
+The server starts straight away and downloads missing model weights in the
+background into the mounted `weights/` volume (progress on the setup page; each
+file lands as `.part` and is renamed only when complete). Forging waits until
+every download has finished. Set `FORGE_SKIP_WEIGHT_DOWNLOAD=1` to skip
+downloads and pre-populate `weights/` yourself (e.g. air-gapped hosts, with
+`python scripts/download_weights.py`).
 
 ## Run locally without a GPU (fallback mode)
 
@@ -48,9 +58,11 @@ FORGE_API_TOKEN=dev-token FORGE_DEVICE=cpu FORGE_UPSCALE_BACKEND=lanczos \
 | GET  | `/immich/search` | proxied asset search (browser UI) |
 | GET  | `/immich/thumbnail/{id}` | proxied thumbnail |
 
-All non-health endpoints require `Authorization: Bearer $FORGE_API_TOKEN`.
-`FORGE_API_TOKEN` is mandatory: if it's unset the API **fails closed** (HTTP 503)
-rather than serving the Immich proxy unauthenticated. CORS is closed by default;
+All API endpoints except `/health`, the setup page (`/`) and `/setup/status`
+require `Authorization: Bearer <Forge token>`. Until setup is complete (a token
+exists and Immich is connected) the API **fails closed** (HTTP 503) rather than
+serving the Immich proxy unauthenticated. The `/setup/*` endpoints are open
+until a token exists, then need it too. CORS is closed by default;
 set `FORGE_CORS_ORIGINS` only if a non-extension web client needs access.
 
 ### Example
