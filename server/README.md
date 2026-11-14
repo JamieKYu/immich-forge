@@ -7,6 +7,9 @@ result and stacks it as the new primary asset.
 ## Run with Docker (GPU host)
 
 Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+The image is `linux/amd64` only (CUDA). On an Apple Silicon Mac, or any machine
+without an NVIDIA GPU, see the platform steps in [`DOCKERHUB.md`](DOCKERHUB.md)
+(`--platform linux/amd64` + `FORGE_DEVICE=cpu`).
 
 ```bash
 cp .env.example .env        # set IMMICH_BASE_URL, IMMICH_API_KEY, FORGE_API_TOKEN
