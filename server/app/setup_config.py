@@ -135,6 +135,16 @@ class SetupConfig:
         self._save({"forge_api_token": token})
         return token
 
+    def set_token(self, token: str) -> str:
+        """Use a token the user chose (e.g. one their extension already has).
+        Raises ValueError if it's too weak to protect the Immich library."""
+        token = token.strip()
+        problem = token_problem(token)
+        if problem:
+            raise ValueError(problem)
+        self._save({"forge_api_token": token})
+        return token
+
     def _save(self, updates: dict[str, str]) -> None:
         blocked = [name for name in updates if name in self._from_env]
         if blocked:
@@ -149,6 +159,20 @@ class SetupConfig:
 
 def new_token() -> str:
     return secrets.token_hex(32)
+
+
+MIN_TOKEN_LENGTH = 16
+
+
+def token_problem(token: str) -> str | None:
+    """Why a chosen token isn't acceptable, or None."""
+    if len(token) < MIN_TOKEN_LENGTH:
+        return f"Use at least {MIN_TOKEN_LENGTH} characters (or generate one)."
+    if len(token) > 256:
+        return "Use at most 256 characters."
+    if any(c.isspace() or not c.isprintable() for c in token):
+        return "The token can't contain spaces or hidden characters."
+    return None
 
 
 def _write_private(path: Path, data: dict) -> None:

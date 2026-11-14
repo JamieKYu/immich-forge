@@ -19,7 +19,8 @@ docker compose up --build
 Then open `http://<host>:8000`. The **setup page** connects Immich (address +
 API key, with a connection test) and creates the Forge token, saved to
 `weights/forge-settings.json` (mode 600) and applied without a restart. Come back
-to change them or make a new token; sign in with the token. Values set as
+any time (sign in with the token) to change the Immich connection, copy the
+token, paste your own (16+ characters) or generate a new one. Values set as
 environment variables win and show as read-only. Setup is "first visitor":
 until a token exists, anyone who reaches the page can complete it. Lost the
 token? `docker exec <container> python -m app.reset_token` prints a new one.

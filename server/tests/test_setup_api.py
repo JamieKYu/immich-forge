@@ -132,6 +132,32 @@ def test_regenerating_the_token_retires_the_old_one(client):
     assert client.get("/models", headers=_auth(new)).status_code == 200
 
 
+def test_paste_your_own_token(client):
+    old = client.post(
+        "/setup/immich", json={"immich_base_url": "http://immich:2283", "immich_api_key": "good-key"}
+    ).json()["token"]
+    mine = "my-existing-extension-token-123"
+    r = client.post("/setup/token", headers=_auth(old), json={"token": mine})
+    assert r.status_code == 200 and r.json()["token"] == mine
+    assert client.get("/models", headers=_auth(old)).status_code == 401
+    assert client.get("/models", headers=_auth(mine)).status_code == 200
+    r = client.post("/setup/token", headers=_auth(mine), json={"token": "weak"})
+    assert r.status_code == 400 and "16 characters" in r.json()["detail"]
+
+
+def test_token_can_be_set_before_immich_on_first_run(client):
+    r = client.post("/setup/token", json={"token": "chosen-before-immich-123"})
+    assert r.status_code == 200
+    # Now the token protects the page, and saving Immich keeps that token.
+    assert client.post("/setup/immich", json={"immich_base_url": "http://i:2283", "immich_api_key": "good-key"}).status_code == 401
+    r = client.post(
+        "/setup/immich", headers=_auth("chosen-before-immich-123"),
+        json={"immich_base_url": "http://i:2283", "immich_api_key": "good-key"},
+    )
+    assert r.status_code == 200 and r.json()["token"] is None
+    assert client.get("/models", headers=_auth("chosen-before-immich-123")).status_code == 200
+
+
 def test_environment_values_cannot_be_changed_on_the_page(client, tmp_path):
     settings = Settings(
         _env_file=None, FORGE_WEIGHTS_DIR=str(tmp_path), FORGE_API_TOKEN="env-token",

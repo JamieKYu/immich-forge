@@ -15,7 +15,7 @@ Endpoints:
   GET  /setup/config            saved connection details (key masked)
   POST /setup/test              test an Immich address + key
   POST /setup/immich            save them (creates the Forge token on first run)
-  POST /setup/token             generate a new Forge token
+  POST /setup/token             set your own Forge token, or generate a new one
   POST /setup/models/retry      retry failed model downloads
 
   Immich-proxy reads for the extension's browser UI (broker keeps the key):
@@ -146,6 +146,10 @@ def _swap_immich_client(app_: FastAPI) -> None:
 _SETUP_PAGE = Path(__file__).parent / "static" / "setup.html"
 
 
+class TokenChoice(BaseModel):
+    token: str | None = None  # omitted: generate one
+
+
 class ImmichDetails(BaseModel):
     immich_base_url: str
     immich_api_key: str | None = None  # empty keeps the saved key
@@ -212,12 +216,16 @@ async def setup_save_immich(details: ImmichDetails, request: Request):
 
 
 @app.post("/setup/token", dependencies=[Depends(require_setup_access)])
-async def setup_new_token(request: Request):
+async def setup_set_token(request: Request, choice: TokenChoice | None = None):
+    """Set the Forge token: the user's own (pasted) or a newly generated one.
+    Either way the old token stops working at once."""
     setup: SetupConfig = request.app.state.setup
-    if not setup.token_set:
-        raise HTTPException(status_code=409, detail="connect Immich first")
     try:
+        if choice and choice.token:
+            return {"token": setup.set_token(choice.token)}
         return {"token": setup.regenerate_token()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except PermissionError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 

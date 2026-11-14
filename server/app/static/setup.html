@@ -42,6 +42,9 @@
   ol { margin: 8px 0 0; padding-left: 20px; } ol li { margin: 4px 0; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
   a { color: var(--accent); }
+  .token-wrap { position: relative; }
+  .token-wrap input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding-right: 64px; }
+  .token-wrap .reveal { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); height: 26px; padding: 0 9px; font-size: 12px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -60,7 +63,7 @@
     </div>
   </section>
 
-  <!-- Sign in (a token exists, this tab doesn't have it) -->
+  <!-- Sign in: a token exists and this tab doesn't have it -->
   <section id="signin" hidden>
     <h2>Sign in</h2>
     <p class="muted small">This server is set up. Enter its Forge token to manage it.</p>
@@ -74,9 +77,9 @@
       <code>docker exec immich-forge python -m app.reset_token</code> to make a new one.</p>
   </section>
 
-  <!-- Immich connection: first-run setup, and management afterwards -->
+  <!-- Immich connection: change any time -->
   <section id="immich" hidden>
-    <h2 id="immich-title">Connect to Immich</h2>
+    <h2>Immich connection <span class="meta" id="immich-meta"></span></h2>
     <p class="muted small" id="immich-intro">Forge needs your Immich address and an API key to read and save photos.</p>
     <form id="immich-form">
       <label for="url">Immich address</label>
@@ -97,32 +100,28 @@
     </form>
   </section>
 
-  <!-- A newly created token, shown once -->
-  <section id="newtoken" hidden>
-    <h2>Your Forge token</h2>
-    <p class="small">Copy it now and keep it safe — it won't be shown again.</p>
-    <div class="token" id="newtoken-value"></div>
-    <div class="row">
-      <button class="primary" id="copy-new">Copy token</button>
-      <button id="newtoken-done">I've saved it</button>
-    </div>
-    <p class="msg ok" id="copy-new-msg" hidden>Copied.</p>
-  </section>
-
-  <!-- Managing: token + extension instructions -->
-  <section id="manage" hidden>
-    <h2>Forge token</h2>
-    <p class="muted small">The Forge extension uses this to sign in to this server.</p>
-    <div class="token" id="token-value">••••••••••••••••</div>
-    <div class="row">
-      <button id="show-token">Show</button>
-      <button id="copy-token">Copy</button>
-      <button id="regen-btn">Generate new token</button>
-    </div>
-    <p class="msg" id="token-msg" hidden></p>
-    <p class="note" id="regen-warning" hidden>The extension will stop working until you paste the new token
-      into its settings. <button class="link" id="regen-confirm">Generate it</button> ·
-      <button class="link" id="regen-cancel">Cancel</button></p>
+  <!-- Forge token: paste your own, copy, or generate any time -->
+  <section id="token" hidden>
+    <h2>Forge token <span class="meta" id="token-meta"></span></h2>
+    <p class="muted small" id="token-intro">The Forge extension uses this to sign in to this server.</p>
+    <form id="token-form">
+      <label for="token-input">Token</label>
+      <div class="token-wrap">
+        <input id="token-input" type="password" autocomplete="off" spellcheck="false"
+               placeholder="Generate one, or paste your own (16+ characters)">
+        <button type="button" class="reveal" id="token-reveal">Show</button>
+      </div>
+      <p class="msg" id="token-msg" hidden></p>
+      <div class="row">
+        <button type="button" id="copy-token">Copy</button>
+        <button type="button" id="regen-btn">Generate new token</button>
+        <button class="primary" type="submit" id="token-save" hidden>Save token</button>
+        <button type="button" id="token-revert" hidden>Cancel</button>
+      </div>
+      <p class="note" id="regen-warning" hidden>The extension will stop working until you paste the new token
+        into its settings. <button type="button" class="link" id="regen-confirm">Generate it</button> ·
+        <button type="button" class="link" id="regen-cancel">Cancel</button></p>
+    </form>
   </section>
 
   <section id="extension" hidden>
@@ -133,7 +132,7 @@
       <li>Server address: <code id="server-address"></code></li>
       <li>API token: your Forge token above. Then <b>Save &amp; test</b>.</li>
     </ol>
-    <div class="row"><button class="link" id="signout">Sign out of this page</button></div>
+    <div class="row" id="signout-row"><button class="link" id="signout">Sign out of this page</button></div>
   </section>
 </main>
 
@@ -141,9 +140,15 @@
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => { $(id).hidden = !on; };
 const TOKEN_KEY = 'forgeToken';
-let token = sessionStorage.getItem(TOKEN_KEY) || '';
-let config = null;      // GET /setup/config
+let token = sessionStorage.getItem(TOKEN_KEY) || '';  // the server's current token, as this tab knows it
+let status = null;     // GET /setup/status
+let config = null;     // GET /setup/config
 let pollTimer = null;
+
+function remember(t) {
+  token = t;
+  if (t) sessionStorage.setItem(TOKEN_KEY, t); else sessionStorage.removeItem(TOKEN_KEY);
+}
 
 async function api(path, { method = 'GET', body } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -171,8 +176,12 @@ function setMsg(id, text, kind) {
 // textarea + execCommand there.
 async function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      /* e.g. "Document is not focused" — fall back below */
+    }
   }
   const ta = document.createElement('textarea');
   ta.value = text;
@@ -228,12 +237,11 @@ function renderModels(m) {
 
 async function pollStatus() {
   clearTimeout(pollTimer);
-  let status;
   try {
     status = await api('/setup/status');
   } catch {
     pollTimer = setTimeout(pollStatus, 5000);
-    return;
+    return null;
   }
   renderModels(status.models);
   // Fast while downloading, slow once settled.
@@ -246,34 +254,35 @@ $('retry-btn').onclick = async () => {
   catch (e) { alert(e.message); }
 };
 
-// --- views ---------------------------------------------------------------
+// --- page state ------------------------------------------------------------
 
 async function route() {
-  const status = await pollStatus();
-  if (!status) return;
-  show('signin', false); show('immich', false); show('manage', false); show('extension', false);
+  if (!(await pollStatus())) return;
+  for (const id of ['signin', 'immich', 'token', 'extension']) show(id, false);
 
-  if (!status.token_set) {
+  if (status.token_set && !token) { showSignIn(); return; }
+  if (status.token_set) {
+    try {
+      config = await api('/setup/config');
+    } catch (e) {
+      if (e.status === 401) { remember(''); showSignIn('That token isn\'t right.'); return; }
+      throw e;
+    }
+  } else {
     // First run: anyone who reaches the page can set it up.
-    $('subtitle').textContent = 'Welcome! Connect Forge to your Immich server to get started.';
-    config = null;
-    renderImmichForm();
-    show('immich');
-    return;
-  }
-  if (!token) { showSignIn(); return; }
-  try {
     config = await api('/setup/config');
-  } catch (e) {
-    if (e.status === 401) { signOut(); showSignIn('That token isn\'t right.'); return; }
-    throw e;
+    remember('');
   }
-  $('subtitle').textContent = status.setup_required
-    ? 'Almost there — connect Forge to Immich.'
-    : 'Forge is set up. You can change its settings here.';
-  renderImmichForm();
-  show('immich');
-  renderManage();
+  $('subtitle').textContent = !status.token_set && !status.immich_configured
+    ? 'Welcome! Connect Forge to your Immich server to get started.'
+    : status.setup_required
+      ? 'Almost there — finish the steps below.'
+      : 'Forge is set up. You can change its settings here any time.';
+  renderImmich();
+  renderToken();
+  $('server-address').textContent = location.origin;
+  show('signout-row', !!token);
+  show('immich'); show('token'); show('extension');
 }
 
 function showSignIn(error) {
@@ -285,40 +294,34 @@ function showSignIn(error) {
 
 $('signin-form').onsubmit = (ev) => {
   ev.preventDefault();
-  token = $('signin-token').value.trim();
-  sessionStorage.setItem(TOKEN_KEY, token);
+  remember($('signin-token').value.trim());
   $('signin-token').value = '';
   route();
 };
+$('signout').onclick = () => { remember(''); route(); };
 
-function signOut() {
-  token = '';
-  sessionStorage.removeItem(TOKEN_KEY);
-}
-$('signout').onclick = () => { signOut(); route(); };
+// --- Immich connection -------------------------------------------------------
 
-// --- Immich form -----------------------------------------------------------
-
-function renderImmichForm() {
-  const managing = !!config;
-  $('immich-title').textContent = managing ? 'Immich connection' : 'Connect to Immich';
-  show('immich-intro', !managing);
-  $('url').value = config ? config.immich_base_url : $('url').value;
-  const urlFromEnv = config && config.from_env.immich_base_url;
-  const keyFromEnv = config && config.from_env.immich_api_key;
-  $('url').readOnly = !!urlFromEnv;
-  $('key').readOnly = !!keyFromEnv;
+function renderImmich() {
+  const saved = status.immich_configured;
+  $('immich-meta').textContent = saved ? 'saved' : '';
+  show('immich-intro', !saved);
+  $('url').value = config.immich_base_url || $('url').value;
+  const urlFromEnv = config.from_env.immich_base_url;
+  const keyFromEnv = config.from_env.immich_api_key;
+  $('url').readOnly = urlFromEnv;
+  $('key').readOnly = keyFromEnv;
   $('key').value = '';
-  $('key').required = !(config && config.immich_api_key_set);
-  $('key').placeholder = config && config.immich_api_key_set
+  $('key').required = !config.immich_api_key_set;
+  $('key').placeholder = config.immich_api_key_set
     ? `Saved${config.immich_api_key_hint ? ` (ends ${config.immich_api_key_hint})` : ''} — enter a new key to replace it`
     : 'Paste your Immich API key';
   const fromEnv = [urlFromEnv && 'address', keyFromEnv && 'API key'].filter(Boolean);
   $('key-help').textContent = fromEnv.length
     ? `The ${fromEnv.join(' and ')} ${fromEnv.length > 1 ? 'are' : 'is'} set by the container (environment variables) and can't be changed here.`
     : 'In Immich: your avatar → Account Settings → API Keys → New API Key.';
-  $('save-btn').textContent = managing ? 'Save changes' : 'Save';
-  $('save-btn').disabled = !!(urlFromEnv && keyFromEnv);
+  $('save-btn').textContent = saved ? 'Save changes' : 'Save';
+  $('save-btn').disabled = urlFromEnv && keyFromEnv;
   show('save-anyway-btn', false);
   setMsg('immich-msg', '');
 }
@@ -340,15 +343,13 @@ async function saveImmich(skipTest) {
   show('save-anyway-btn', false);
   try {
     const r = await api('/setup/immich', { method: 'POST', body: immichBody(skipTest) });
-    if (r.token) {
-      // First run: the token was just created. This tab is now signed in.
-      token = r.token;
-      sessionStorage.setItem(TOKEN_KEY, token);
-      showNewToken(r.token);
-      return;
-    }
+    if (r.token) remember(r.token);  // first run: a token was created to protect the page
     await route();
     setMsg('immich-msg', '✓ Saved. Forge is using the new settings.', 'ok');
+    if (r.token) {
+      revealToken();
+      setMsg('token-msg', 'A Forge token was created for you — copy it into the extension, or paste your own instead.', 'ok');
+    }
   } catch (e) {
     setMsg('immich-msg', e.message, 'bad');
     if (e.status === 400) show('save-anyway-btn');
@@ -357,53 +358,73 @@ async function saveImmich(skipTest) {
 $('immich-form').onsubmit = (ev) => { ev.preventDefault(); saveImmich(false); };
 $('save-anyway-btn').onclick = () => saveImmich(true);
 
-// --- tokens ----------------------------------------------------------------
+// --- Forge token -------------------------------------------------------------
 
-function showNewToken(value) {
-  show('signin', false); show('immich', false); show('manage', false); show('extension', false);
-  $('newtoken-value').textContent = value;
-  setMsg('copy-new-msg', '');
-  show('newtoken');
-}
-$('copy-new').onclick = async () => {
-  try {
-    await copyText($('newtoken-value').textContent);
-    setMsg('copy-new-msg', 'Copied.', 'ok');
-  } catch (e) { setMsg('copy-new-msg', e.message, 'bad'); }
-};
-$('newtoken-done').onclick = () => { show('newtoken', false); route(); };
-
-function renderManage() {
+function renderToken() {
   const envToken = config.from_env.forge_api_token;
-  $('token-value').textContent = '••••••••••••••••';
-  $('show-token').textContent = 'Show';
+  $('token-meta').textContent = token ? 'saved' : '';
+  $('token-input').value = token;
+  $('token-input').readOnly = envToken;
+  $('token-input').type = 'password';
+  $('token-reveal').textContent = 'Show';
   $('regen-btn').disabled = envToken;
+  $('copy-token').disabled = !token;
+  show('token-save', false); show('token-revert', false); show('regen-warning', false);
   setMsg('token-msg', envToken ? 'Set by the container (FORGE_API_TOKEN), so it can\'t be changed here.' : '', 'warn');
-  show('regen-warning', false);
-  $('server-address').textContent = location.origin;
-  show('manage'); show('extension');
 }
-$('show-token').onclick = () => {
-  const hidden = $('show-token').textContent === 'Show';
-  $('token-value').textContent = hidden ? token : '••••••••••••••••';
-  $('show-token').textContent = hidden ? 'Hide' : 'Show';
+
+function revealToken() {
+  $('token-input').type = 'text';
+  $('token-reveal').textContent = 'Hide';
+}
+
+$('token-reveal').onclick = () => {
+  const hidden = $('token-input').type === 'password';
+  $('token-input').type = hidden ? 'text' : 'password';
+  $('token-reveal').textContent = hidden ? 'Hide' : 'Show';
 };
+
+// Typing or pasting a different token offers to save it.
+$('token-input').oninput = () => {
+  const edited = $('token-input').value.trim() !== token;
+  show('token-save', edited);
+  show('token-revert', edited && !!token);
+  $('copy-token').disabled = !$('token-input').value.trim();
+  setMsg('token-msg', edited && token ? 'Saving a new token means pasting it into the extension too.' : '', 'warn');
+};
+$('token-revert').onclick = () => renderToken();
+
+$('token-form').onsubmit = async (ev) => {
+  ev.preventDefault();
+  try {
+    const r = await api('/setup/token', { method: 'POST', body: { token: $('token-input').value.trim() } });
+    remember(r.token);
+    await route();
+    revealToken();
+    setMsg('token-msg', '✓ Token saved. Use the same token in the extension.', 'ok');
+  } catch (e) { setMsg('token-msg', e.message, 'bad'); }
+};
+
 $('copy-token').onclick = async () => {
   try {
-    await copyText(token);
+    await copyText($('token-input').value.trim());
     setMsg('token-msg', 'Copied.', 'ok');
   } catch (e) { setMsg('token-msg', e.message, 'bad'); }
 };
-$('regen-btn').onclick = () => show('regen-warning');
-$('regen-cancel').onclick = () => show('regen-warning', false);
-$('regen-confirm').onclick = async () => {
+
+async function generateToken() {
   try {
     const r = await api('/setup/token', { method: 'POST' });
-    token = r.token;
-    sessionStorage.setItem(TOKEN_KEY, token);
-    showNewToken(r.token);
+    remember(r.token);
+    await route();
+    revealToken();
+    setMsg('token-msg', '✓ New token saved. Copy it into the extension.', 'ok');
   } catch (e) { setMsg('token-msg', e.message, 'bad'); }
-};
+}
+// Replacing an existing token breaks the extension until it's updated: confirm.
+$('regen-btn').onclick = () => (token ? show('regen-warning') : generateToken());
+$('regen-cancel').onclick = () => show('regen-warning', false);
+$('regen-confirm').onclick = () => generateToken();
 
 route();
 </script>

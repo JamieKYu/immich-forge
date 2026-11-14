@@ -83,9 +83,9 @@ In your browser, go to **`http://YOUR_FORGE_IP:8000`** (or `http://localhost:800
      <br>⚠️ Use the computer's **network IP address**, not `localhost`
   2. **Immich API key** — in Immich: **your avatar (top-right) → Account Settings → API Keys → New API Key**. Copy it.
   3. Click **Test connection**, then **Save**.
-- **Copy your Forge token.** Forge creates it when you save and shows it once — you'll paste it into the extension.
+- **Copy your Forge token.** Forge creates one when you save (or paste your own, 16+ characters) — you'll paste it into the extension.
 
-Come back to the same address any time to change the Immich connection or make a new token (sign in with your token).
+Come back to the same address any time — sign in with your token — to change the Immich connection, copy the token, or make a new one.
 
 ### Step 3 — Connect the Chrome extension
 
