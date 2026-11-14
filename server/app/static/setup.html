@@ -89,7 +89,7 @@
     </form>
     <!-- Fallback: the Forge token (e.g. Immich not connected, or the key was replaced in Immich). -->
     <form id="signin-token-form" hidden>
-      <p class="muted small" id="signin-token-intro">Enter this server's Forge token to manage it.</p>
+      <p class="muted small" id="signin-token-intro">Sign in with your server's Forge token.</p>
       <label for="signin-token">Forge token</label>
       <input id="signin-token" type="password" autocomplete="off" required>
       <p class="msg bad" id="signin-token-msg" hidden></p>
@@ -97,9 +97,9 @@
         <button class="primary" type="submit">Sign in</button>
         <button type="button" class="link" id="use-immich">Use your Immich API key instead</button>
       </div>
-      <p class="muted small" style="margin-top:14px">Lost the token? Sign in with your Immich URL and
-        API key instead, or make a new token by running <code>python -m app.reset_token</code> in the
-        Forge container, e.g. <code>docker exec &lt;container-name&gt; python -m app.reset_token</code>
+      <p class="muted small" style="margin-top:14px"><b>Lost the token?</b><br>
+        Make a new one by running <code>python -m app.reset_token</code> in the Forge container, e.g.
+        <code>docker exec &lt;container-name&gt; python -m app.reset_token</code>
         (find the name with <code>docker ps</code>).</p>
     </form>
   </section>
