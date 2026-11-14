@@ -369,7 +369,7 @@ function renderImmich() {
   $('key').value = '';
   $('key').required = !config.immich_api_key_set;
   $('key').placeholder = config.immich_api_key_set
-    ? `${config.immich_api_key_hint ? `Immich API key ending in ${config.immich_api_key_hint}` : 'Immich API key saved'}. Enter a new key to replace it`
+    ? `${config.immich_api_key_hint ? `Key ending in ${config.immich_api_key_hint}` : 'Key saved'}. Enter a new key to replace it`
     : 'Paste your Immich API key';
   const fromEnv = [urlFromEnv && 'address', keyFromEnv && 'API key'].filter(Boolean);
   $('key-help').textContent = fromEnv.length
@@ -465,7 +465,7 @@ $('token-form').onsubmit = async (ev) => {
 $('copy-token').onclick = async () => {
   try {
     await copyText($('token-input').value.trim());
-    setMsg('token-msg', 'Copied', 'ok');
+    setMsg('token-msg', '✓ Copied', 'ok');
   } catch (e) { setMsg('token-msg', e.message, 'bad'); }
 };
 
@@ -475,7 +475,7 @@ async function generateToken() {
     remember(r.token);
     await route();
     revealToken();
-    setMsg('token-msg', '✓ New token saved. Copy it into the extension.', 'ok');
+    setMsg('token-msg', '✓ New server token created', 'ok');
   } catch (e) { setMsg('token-msg', e.message, 'bad'); }
 }
 $('regen-btn').onclick = () => generateToken();
