@@ -68,7 +68,7 @@
     <h2>Sign in</h2>
     <!-- Default: the Immich address + API key this server is connected with. -->
     <form id="signin-immich-form">
-      <p class="muted small">This server is set up. Enter the Immich address and API key it's connected with to manage it.</p>
+      <p class="muted small">Sign in with your Immich URL and API key.</p>
       <label for="signin-url">Immich address</label>
       <input id="signin-url" placeholder="http://192.168.1.50:2283" autocomplete="url" required>
       <label for="signin-key">Immich API key</label>
@@ -89,8 +89,10 @@
         <button class="primary" type="submit">Sign in</button>
         <button type="button" class="link" id="use-immich">Use your Immich API key instead</button>
       </div>
-      <p class="muted small" style="margin-top:14px">Lost the token? Run
-        <code>docker exec immich-forge python -m app.reset_token</code> to make a new one.</p>
+      <p class="muted small" style="margin-top:14px">Lost the token? Sign in with your Immich URL and
+        API key instead, or make a new token by running <code>python -m app.reset_token</code> in the
+        Forge container, e.g. <code>docker exec &lt;container-name&gt; python -m app.reset_token</code>
+        (find the name with <code>docker ps</code>).</p>
     </form>
   </section>
 
@@ -135,9 +137,6 @@
         <button class="primary" type="submit" id="token-save" hidden>Save token</button>
         <button type="button" id="token-revert" hidden>Cancel</button>
       </div>
-      <p class="note" id="regen-warning" hidden>The extension will stop working until you paste the new token
-        into its settings. <button type="button" class="link" id="regen-confirm">Generate it</button> ·
-        <button type="button" class="link" id="regen-cancel">Cancel</button></p>
     </form>
   </section>
 
@@ -424,7 +423,7 @@ function renderToken() {
   $('token-reveal').textContent = 'Show';
   $('regen-btn').disabled = envToken;
   $('copy-token').disabled = !token;
-  show('token-save', false); show('token-revert', false); show('regen-warning', false);
+  show('token-save', false); show('token-revert', false);
   setMsg('token-msg', envToken ? 'Set by the container (FORGE_API_TOKEN), so it can\'t be changed here.' : '', 'warn');
 }
 
@@ -476,10 +475,7 @@ async function generateToken() {
     setMsg('token-msg', '✓ New token saved. Copy it into the extension.', 'ok');
   } catch (e) { setMsg('token-msg', e.message, 'bad'); }
 }
-// Replacing an existing token breaks the extension until it's updated: confirm.
-$('regen-btn').onclick = () => (token ? show('regen-warning') : generateToken());
-$('regen-cancel').onclick = () => show('regen-warning', false);
-$('regen-confirm').onclick = () => generateToken();
+$('regen-btn').onclick = () => generateToken();
 
 route();
 </script>
