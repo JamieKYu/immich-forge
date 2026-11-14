@@ -19,11 +19,14 @@ docker compose up --build
 Then open `http://<host>:8000`. The **setup page** connects Immich (address +
 API key, with a connection test) and creates the Forge token, saved to
 `weights/forge-settings.json` (mode 600) and applied without a restart. Come back
-any time (sign in with the token) to change the Immich connection, copy the
-token, paste your own (16+ characters) or generate a new one. Values set as
-environment variables win and show as read-only. Setup is "first visitor":
-until a token exists, anyone who reaches the page can complete it. Lost the
-token? `docker exec <container> python -m app.reset_token` prints a new one.
+any time to change the Immich connection, copy the token, paste your own (16+
+characters) or generate a new one. Returning visitors sign in with the saved
+Immich address and API key (holding the key already means full library access,
+so it may unlock the token too), or with the Forge token. Values set as
+environment variables win and show as read-only. First-time setup is "first
+visitor": until a token exists, anyone who reaches the page can complete it.
+Lost the token? Sign in with Immich and copy it, or run
+`docker exec <container> python -m app.reset_token` for a new one.
 
 The server starts straight away and downloads missing model weights in the
 background into the mounted `weights/` volume (progress on the setup page; each

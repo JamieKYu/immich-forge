@@ -158,6 +158,24 @@ def test_token_can_be_set_before_immich_on_first_run(client):
     assert client.get("/models", headers=_auth("chosen-before-immich-123")).status_code == 200
 
 
+def test_sign_in_with_immich_address_and_key(client):
+    token = client.post(
+        "/setup/immich", json={"immich_base_url": "http://immich:2283", "immich_api_key": "good-key"}
+    ).json()["token"]
+    r = client.post("/setup/signin", json={"immich_base_url": "http://immich:2283/", "immich_api_key": "good-key"})
+    assert r.status_code == 200 and r.json()["token"] == token
+    # The returned token unlocks the page.
+    assert client.get("/setup/config", headers=_auth(r.json()["token"])).status_code == 200
+    r = client.post("/setup/signin", json={"immich_base_url": "http://immich:2283", "immich_api_key": "wrong"})
+    assert r.status_code == 401 and "doesn't match" in r.json()["detail"]
+
+
+def test_immich_sign_in_needs_a_saved_connection(client):
+    client.post("/setup/token", json={"token": "chosen-before-immich-123"})
+    r = client.post("/setup/signin", json={"immich_base_url": "http://i:2283", "immich_api_key": "k"})
+    assert r.status_code == 409 and "Forge token" in r.json()["detail"]
+
+
 def test_environment_values_cannot_be_changed_on_the_page(client, tmp_path):
     settings = Settings(
         _env_file=None, FORGE_WEIGHTS_DIR=str(tmp_path), FORGE_API_TOKEN="env-token",

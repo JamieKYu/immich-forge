@@ -114,6 +114,17 @@ class SetupConfig:
 
     # --- writing ------------------------------------------------------------
 
+    def immich_matches(self, base_url: str, api_key: str) -> bool:
+        """Do these match the saved Immich address and key? Used to sign in to
+        the setup page: holding the Immich key already means full access to the
+        library, so it may also unlock the Forge token."""
+        c = self.connection
+        if not c.immich_configured or not api_key:
+            return False
+        same_url = _normal_url(base_url) == _normal_url(c.immich_base_url)
+        same_key = secrets.compare_digest(api_key.strip(), c.immich_api_key)
+        return same_url and same_key
+
     def save_immich(self, base_url: str, api_key: str | None) -> None:
         """Save the Immich address, and the key if one is given (None keeps the
         saved key). Raises PermissionError for a value set by the environment."""
@@ -155,6 +166,14 @@ class SetupConfig:
             _write_private(self._path, data)
             self._stored = data
             self._mtime = self._file_mtime()
+
+
+def _normal_url(url: str) -> str:
+    """Compare addresses loosely: case of scheme/host and a trailing slash."""
+    url = url.strip().rstrip("/")
+    scheme, sep, rest = url.partition("://")
+    host, slash, path = rest.partition("/")
+    return f"{scheme.lower()}{sep}{host.lower()}{slash}{path}"
 
 
 def new_token() -> str:

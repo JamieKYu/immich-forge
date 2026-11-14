@@ -85,7 +85,7 @@ In your browser, go to **`http://YOUR_FORGE_IP:8000`** (or `http://localhost:800
   3. Click **Test connection**, then **Save**.
 - **Copy your Forge token.** Forge creates one when you save (or paste your own, 16+ characters) — you'll paste it into the extension.
 
-Come back to the same address any time — sign in with your token — to change the Immich connection, copy the token, or make a new one.
+Come back to the same address any time — sign in with your Immich address and API key — to change the Immich connection, copy the token, or make a new one.
 
 ### Step 3 — Connect the Chrome extension
 
@@ -147,7 +147,7 @@ volumes:
 | **Test connection** can't reach Immich | Use your Immich computer's **IP address** (not `localhost` — inside the container that means the container itself) and port `2283`. |
 | Extension says the server **isn't set up yet** | Finish step 2 on the setup page. Until then Forge refuses all requests — this keeps your library private. |
 | Extension says **token rejected** | Paste the Forge token again. If you made a new one on the setup page, the old one stopped working. |
-| **Lost your Forge token** | Run `docker exec immich-forge python -m app.reset_token`. It prints a new one; paste it into the extension and use it to sign in to the setup page. |
+| **Lost your Forge token** | Sign in to the setup page with your Immich address and API key and copy it from there. Or run `docker exec immich-forge python -m app.reset_token` to make a new one. |
 | Forging says **models still downloading** | Wait for the download to finish — progress is on the setup page. If a download failed, click **Retry** there. |
 | Extension **can't reach** the server | Check the container is running (`docker ps`), the address uses port `8000`, and no firewall blocks it. From another computer, use the Forge machine's IP, not `localhost`. |
 | `"cuda_available": false` on an NVIDIA machine | Add `--gpus all` (or the compose `deploy` block), and install the NVIDIA Container Toolkit on Linux. |

@@ -70,6 +70,17 @@ def test_user_chosen_token(tmp_path):
     assert setup.connection.forge_api_token == "my-own-token-1234567"  # unchanged
 
 
+def test_immich_credentials_match_loosely_on_the_address(tmp_path):
+    setup = SetupConfig(_settings(tmp_path))
+    assert not setup.immich_matches("http://immich:2283", "key-123")  # nothing saved yet
+    setup.save_immich("http://Immich:2283", "key-123")
+    assert setup.immich_matches("http://immich:2283/", " key-123 ")
+    assert setup.immich_matches("HTTP://IMMICH:2283", "key-123")
+    assert not setup.immich_matches("http://immich:2283", "key-124")
+    assert not setup.immich_matches("http://other:2283", "key-123")
+    assert not setup.immich_matches("http://immich:2283", "")
+
+
 def test_environment_wins_and_is_read_only(tmp_path):
     (tmp_path / SETTINGS_FILE).write_text(json.dumps({"immich_base_url": "http://file:2283"}))
     setup = SetupConfig(_settings(tmp_path, IMMICH_BASE_URL="http://env:2283", FORGE_API_TOKEN="t"))

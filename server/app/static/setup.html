@@ -63,18 +63,35 @@
     </div>
   </section>
 
-  <!-- Sign in: a token exists and this tab doesn't have it -->
+  <!-- Sign in: the server is set up and this tab isn't signed in -->
   <section id="signin" hidden>
     <h2>Sign in</h2>
-    <p class="muted small">This server is set up. Enter its Forge token to manage it.</p>
-    <form id="signin-form">
-      <label for="signin-token">Forge token</label>
-      <input id="signin-token" type="password" autocomplete="current-password" required>
-      <p class="msg bad" id="signin-msg" hidden></p>
-      <div class="row"><button class="primary" type="submit">Sign in</button></div>
+    <!-- Default: the Immich address + API key this server is connected with. -->
+    <form id="signin-immich-form">
+      <p class="muted small">This server is set up. Enter the Immich address and API key it's connected with to manage it.</p>
+      <label for="signin-url">Immich address</label>
+      <input id="signin-url" placeholder="http://192.168.1.50:2283" autocomplete="url" required>
+      <label for="signin-key">Immich API key</label>
+      <input id="signin-key" type="password" autocomplete="current-password" required>
+      <p class="msg bad" id="signin-immich-msg" hidden></p>
+      <div class="row">
+        <button class="primary" type="submit">Sign in</button>
+        <button type="button" class="link" id="use-token">Use your Forge token instead</button>
+      </div>
     </form>
-    <p class="muted small" style="margin-top:14px">Lost the token? Run
-      <code>docker exec immich-forge python -m app.reset_token</code> to make a new one.</p>
+    <!-- Fallback: the Forge token (e.g. Immich not connected, or the key was replaced in Immich). -->
+    <form id="signin-token-form" hidden>
+      <p class="muted small" id="signin-token-intro">Enter this server's Forge token to manage it.</p>
+      <label for="signin-token">Forge token</label>
+      <input id="signin-token" type="password" autocomplete="off" required>
+      <p class="msg bad" id="signin-token-msg" hidden></p>
+      <div class="row">
+        <button class="primary" type="submit">Sign in</button>
+        <button type="button" class="link" id="use-immich">Use your Immich API key instead</button>
+      </div>
+      <p class="muted small" style="margin-top:14px">Lost the token? Run
+        <code>docker exec immich-forge python -m app.reset_token</code> to make a new one.</p>
+    </form>
   </section>
 
   <!-- Immich connection: change any time -->
@@ -265,7 +282,7 @@ async function route() {
     try {
       config = await api('/setup/config');
     } catch (e) {
-      if (e.status === 401) { remember(''); showSignIn('That token isn\'t right.'); return; }
+      if (e.status === 401) { remember(''); showSignIn(); return; }
       throw e;
     }
   } else {
@@ -273,30 +290,68 @@ async function route() {
     config = await api('/setup/config');
     remember('');
   }
+  // First run starts with just the Immich connection; the token section
+  // appears once there's a token (created when Immich is saved).
+  const firstRun = !status.token_set
   $('subtitle').textContent = !status.token_set && !status.immich_configured
     ? 'Welcome! Connect Forge to your Immich server to get started.'
     : status.setup_required
       ? 'Almost there — finish the steps below.'
       : 'Forge is set up. You can change its settings here any time.';
   renderImmich();
-  renderToken();
   $('server-address').textContent = location.origin;
   show('signout-row', !!token);
-  show('immich'); show('token'); show('extension');
+  show('immich');
+  if (!firstRun) {
+    renderToken();
+    show('token'); show('extension');
+  }
 }
 
-function showSignIn(error) {
+// --- sign in ------------------------------------------------------------------
+
+function showSignIn() {
   $('subtitle').textContent = 'Server setup';
-  setMsg('signin-msg', error, 'bad');
+  // Immich sign-in needs a saved connection; otherwise only the token works.
+  signInWith(status.immich_configured ? 'immich' : 'token');
+  show('use-immich', status.immich_configured);
   show('signin');
-  $('signin-token').focus();
 }
 
-$('signin-form').onsubmit = (ev) => {
+function signInWith(mode) {
+  show('signin-immich-form', mode === 'immich');
+  show('signin-token-form', mode === 'token');
+  setMsg('signin-immich-msg', ''); setMsg('signin-token-msg', '');
+  $(mode === 'immich' ? 'signin-url' : 'signin-token').focus();
+}
+$('use-token').onclick = () => signInWith('token');
+$('use-immich').onclick = () => signInWith('immich');
+
+$('signin-immich-form').onsubmit = async (ev) => {
+  ev.preventDefault();
+  setMsg('signin-immich-msg', '');
+  try {
+    const r = await api('/setup/signin', {
+      method: 'POST',
+      body: { immich_base_url: $('signin-url').value.trim(), immich_api_key: $('signin-key').value.trim() },
+    });
+    $('signin-key').value = '';
+    remember(r.token);
+    route();
+  } catch (e) { setMsg('signin-immich-msg', e.message, 'bad'); }
+};
+
+$('signin-token-form').onsubmit = async (ev) => {
   ev.preventDefault();
   remember($('signin-token').value.trim());
   $('signin-token').value = '';
-  route();
+  try {
+    await api('/setup/config');
+    route();
+  } catch (e) {
+    remember('');
+    setMsg('signin-token-msg', e.status === 401 ? 'That token isn\'t right.' : e.message, 'bad');
+  }
 };
 $('signout').onclick = () => { remember(''); route(); };
 

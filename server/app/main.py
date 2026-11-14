@@ -12,6 +12,7 @@ Endpoints:
 
   Setup page API (see setup_config.py; first visitor until a token exists):
   GET  /setup/status            setup state + model download progress (public)
+  POST /setup/signin            sign in with the saved Immich address + key
   GET  /setup/config            saved connection details (key masked)
   POST /setup/test              test an Immich address + key
   POST /setup/immich            save them (creates the Forge token on first run)
@@ -146,6 +147,11 @@ def _swap_immich_client(app_: FastAPI) -> None:
 _SETUP_PAGE = Path(__file__).parent / "static" / "setup.html"
 
 
+class ImmichSignIn(BaseModel):
+    immich_base_url: str
+    immich_api_key: str
+
+
 class TokenChoice(BaseModel):
     token: str | None = None  # omitted: generate one
 
@@ -171,6 +177,25 @@ async def setup_status(request: Request):
         "immich_configured": conn.immich_configured,
         "models": request.app.state.downloader.status(),
     }
+
+
+@app.post("/setup/signin")
+async def setup_signin(creds: ImmichSignIn, request: Request):
+    """Sign in to the setup page with the saved Immich address and API key.
+    Returns the Forge token, which the page then uses (and can show/copy)."""
+    setup: SetupConfig = request.app.state.setup
+    if not setup.connection.immich_configured:
+        raise HTTPException(
+            status_code=409, detail="Immich isn't connected yet — sign in with your Forge token"
+        )
+    if not setup.immich_matches(creds.immich_base_url, creds.immich_api_key):
+        await asyncio.sleep(0.5)  # make guessing slow
+        raise HTTPException(
+            status_code=401,
+            detail="That doesn't match the saved Immich address and API key.",
+        )
+    token = setup.connection.forge_api_token or setup.ensure_token()
+    return {"token": token}
 
 
 @app.get("/setup/config", dependencies=[Depends(require_setup_access)])
