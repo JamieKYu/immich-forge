@@ -98,9 +98,7 @@
         <button type="button" class="link" id="use-immich">Use your Immich API key instead</button>
       </div>
       <p class="muted small" style="margin-top:14px"><b>Lost the token?</b><br>
-        Make a new one by running <code>python -m app.reset_token</code> in the Forge container, e.g.
-        <code>docker exec &lt;container-name&gt; python -m app.reset_token</code>
-        (find the name with <code>docker ps</code>).</p>
+        Make a new one by running <code>docker exec &lt;container-name&gt; python -m app.reset_token</code></p>
     </form>
   </section>
 
@@ -128,7 +126,6 @@
   <!-- Forge token: paste your own, copy, or generate any time -->
   <section id="token" hidden>
     <h2>Forge token <span class="meta" id="token-meta"></span></h2>
-    <p class="muted small" id="token-intro">The Forge for Immich Chrome extension uses this to sign in to this server.</p>
     <form id="token-form">
       <label for="token-input">Token</label>
       <div class="token-wrap">
@@ -372,7 +369,7 @@ function renderImmich() {
   $('key').value = '';
   $('key').required = !config.immich_api_key_set;
   $('key').placeholder = config.immich_api_key_set
-    ? `Saved${config.immich_api_key_hint ? ` (ends ${config.immich_api_key_hint})` : ''} — enter a new key to replace it`
+    ? `${config.immich_api_key_hint ? `Immich API key ending in ${config.immich_api_key_hint}` : 'Immich API key saved'}. Enter a new key to replace it`
     : 'Paste your Immich API key';
   const fromEnv = [urlFromEnv && 'address', keyFromEnv && 'API key'].filter(Boolean);
   $('key-help').textContent = fromEnv.length
@@ -404,10 +401,10 @@ async function saveImmich(skipTest) {
     const r = await api('/setup/immich', { method: 'POST', body: immichBody(skipTest) });
     if (r.token) remember(r.token);  // first run: a token was created to protect the page
     await route();
-    setMsg('immich-msg', '✓ Saved. Forge is using the new settings.', 'ok');
+    setMsg('immich-msg', '✓ Saved', 'ok');
     if (r.token) {
       revealToken();
-      setMsg('token-msg', 'A Forge token was created for you — copy it into the extension, or paste your own instead.', 'ok');
+      setMsg('token-msg', 'Copy your new Forge token, or paste your own instead.', 'ok');
     }
   } catch (e) {
     setMsg('immich-msg', e.message, 'bad');
@@ -468,7 +465,7 @@ $('token-form').onsubmit = async (ev) => {
 $('copy-token').onclick = async () => {
   try {
     await copyText($('token-input').value.trim());
-    setMsg('token-msg', 'Copied.', 'ok');
+    setMsg('token-msg', 'Copied', 'ok');
   } catch (e) { setMsg('token-msg', e.message, 'bad'); }
 };
 
