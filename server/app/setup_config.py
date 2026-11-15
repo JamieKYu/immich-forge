@@ -127,10 +127,16 @@ class SetupConfig:
 
     def save_immich(self, base_url: str, api_key: str | None) -> None:
         """Save the Immich address, and the key if one is given (None keeps the
-        saved key). Raises PermissionError for a value set by the environment."""
-        updates = {"immich_base_url": base_url.strip().rstrip("/")}
-        if api_key:
+        saved key). Values the container environment sets are left alone, so
+        e.g. a key can be saved when only IMMICH_BASE_URL comes from the
+        environment. Raises PermissionError if nothing here can be saved."""
+        updates = {}
+        if not self.from_env("immich_base_url"):
+            updates["immich_base_url"] = base_url.strip().rstrip("/")
+        if api_key and not self.from_env("immich_api_key"):
             updates["immich_api_key"] = api_key.strip()
+        if not updates:
+            raise PermissionError("immich_base_url and immich_api_key set by the container environment")
         self._save(updates)
 
     def ensure_token(self) -> str | None:

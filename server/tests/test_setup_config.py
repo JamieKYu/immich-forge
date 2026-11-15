@@ -93,6 +93,21 @@ def test_environment_wins_and_is_read_only(tmp_path):
         setup.regenerate_token()
 
 
+def test_key_can_be_saved_when_only_the_address_is_from_env(tmp_path):
+    setup = SetupConfig(_settings(tmp_path, IMMICH_BASE_URL="http://env:2283"))
+    # The page sends the (read-only) address along with the new key.
+    setup.save_immich("http://env:2283", "key-123")
+    c = setup.connection
+    assert c.immich_base_url == "http://env:2283" and c.immich_api_key == "key-123"
+
+
+def test_address_can_be_saved_when_only_the_key_is_from_env(tmp_path):
+    setup = SetupConfig(_settings(tmp_path, IMMICH_API_KEY="env-key"))
+    setup.save_immich("http://page:2283", None)
+    c = setup.connection
+    assert c.immich_base_url == "http://page:2283" and c.immich_api_key == "env-key"
+
+
 def test_empty_environment_value_does_not_count(tmp_path):
     setup = SetupConfig(_settings(tmp_path, FORGE_API_TOKEN=""))
     assert not setup.from_env("forge_api_token")

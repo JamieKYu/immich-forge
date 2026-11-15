@@ -188,6 +188,14 @@ def test_environment_values_cannot_be_changed_on_the_page(client, tmp_path):
     assert r.status_code == 409
 
 
+def test_save_key_when_address_comes_from_env(client, tmp_path):
+    settings = Settings(_env_file=None, FORGE_WEIGHTS_DIR=str(tmp_path), IMMICH_BASE_URL="http://env:2283")
+    app.state.setup = SetupConfig(settings)
+    r = client.post("/setup/immich", json={"immich_base_url": "http://env:2283", "immich_api_key": "good-key"})
+    assert r.status_code == 200 and r.json()["token"]
+    assert not client.get("/setup/status").json()["setup_required"]
+
+
 def test_forging_waits_for_model_downloads(client):
     token = client.post(
         "/setup/immich", json={"immich_base_url": "http://immich:2283", "immich_api_key": "good-key"}

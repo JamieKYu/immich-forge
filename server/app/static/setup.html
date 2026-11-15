@@ -388,14 +388,6 @@ function immichFromEnv() {
   return !!(config && config.from_env.immich_base_url && config.from_env.immich_api_key);
 }
 
-// 4. "Save changes" only when the address or key differs from what's saved.
-let savedUrl = '';
-function updateSaveButton() {
-  const changed = $('url').value.trim() !== savedUrl || $('key').value.trim() !== '';
-  $('save-btn').disabled = !changed;
-}
-$('url').addEventListener('input', updateSaveButton);
-$('key').addEventListener('input', updateSaveButton);
 
 function renderImmich() {
   const saved = status.immich_configured;
@@ -417,11 +409,8 @@ function renderImmich() {
     ? `Set by container environment variable${envVars.length > 1 ? 's' : ''} (${envVars.join(' & ')}).`
     : '';
   show('immich-env', envVars.length > 0);
-  $('save-btn').textContent = saved ? 'Save changes' : 'Save';
-  // 2. Nothing to save when both come from the environment.
+  // Nothing to save when both come from the environment.
   show('save-btn', !immichFromEnv());
-  savedUrl = saved ? (config.immich_base_url || '') : '';
-  updateSaveButton();
   show('save-anyway-btn', false);
   setMsg('immich-msg', '');
   if (saved) checkImmich();
