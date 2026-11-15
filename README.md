@@ -45,6 +45,22 @@ See [`server/README.md`](server/README.md) and
 
 ## Quick start
 
+Run the published server image (any Intel/AMD machine; add `--gpus all` to use
+an NVIDIA GPU, or `--platform linux/amd64` on an Apple Silicon Mac):
+
+```bash
+docker run -d --name immich-forge -p 8000:8000 \
+  -v immich-forge-weights:/app/weights --restart unless-stopped \
+  jamiekyu/immich-forge
+```
+
+Then open `http://<your-ip>:8000` to connect Immich, and install the
+[Forge for Immich](https://chromewebstore.google.com/detail/forge-for-immich/ceaoooljelkcaagcljambkdldadpblgc)
+Chrome extension. Step-by-step instructions per platform:
+[`server/DOCKERHUB.md`](server/DOCKERHUB.md).
+
+### From source
+
 ```bash
 # 1. Forge server (GPU host with NVIDIA Container Toolkit)
 cd server
