@@ -21,6 +21,8 @@
   h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   h2 .meta { font-size: 12px; font-weight: 400; color: var(--muted); }
   h2 .meta.ready { color: var(--ok); }
+  h2 .meta.not-ready { color: var(--bad); }
+  .env-note { color: var(--warn); }
   label { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 12px; }
   input { width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
   input[readonly] { color: var(--muted); }
@@ -112,7 +114,7 @@
 
       <label for="key">Immich API key</label>
       <input id="key" type="password" autocomplete="off">
-      <p class="muted small" style="margin:4px 0 0" id="key-help" hidden></p>
+      <p class="small env-note" style="margin:4px 0 0" id="key-help" hidden></p>
 
       <p class="msg" id="immich-msg" hidden></p>
       <div class="row">
@@ -356,10 +358,33 @@ $('signout').onclick = () => { remember(''); route(); };
 
 // --- Immich connection -------------------------------------------------------
 
+function setImmichStatus(text, kind) {
+  $('immich-meta').textContent = text;
+  $('immich-meta').classList.toggle('ready', kind === 'ready');
+  $('immich-meta').classList.toggle('not-ready', kind === 'not-ready');
+}
+
+// "Ready" means Immich actually answers with the saved address and key — not
+// just that something was saved (Save anyway can store a key Immich rejects).
+let immichCheck = 0;
+async function checkImmich() {
+  const run = ++immichCheck;
+  setImmichStatus('checking…', '');
+  let result;
+  try {
+    // No key in the body: the server tests the saved one.
+    result = await api('/setup/test', { method: 'POST', body: { immich_base_url: config.immich_base_url } });
+  } catch (e) {
+    result = { ok: false, message: e.message };
+  }
+  if (run !== immichCheck) return;  // a newer check started meanwhile
+  setImmichStatus(result.ok ? 'ready' : 'not ready', result.ok ? 'ready' : 'not-ready');
+  if (!result.ok) setMsg('immich-msg', result.message, 'bad');
+}
+
 function renderImmich() {
   const saved = status.immich_configured;
-  $('immich-meta').textContent = saved ? 'ready' : '';
-  $('immich-meta').classList.toggle('ready', saved);
+  setImmichStatus('', '');
   show('immich-intro', !saved);
   $('url').value = config.immich_base_url || $('url').value;
   const urlFromEnv = config.from_env.immich_base_url;
@@ -368,18 +393,20 @@ function renderImmich() {
   $('key').readOnly = keyFromEnv;
   $('key').value = '';
   $('key').required = !config.immich_api_key_set;
-  $('key').placeholder = config.immich_api_key_set
-    ? `${config.immich_api_key_hint ? `Key ending in ${config.immich_api_key_hint}` : 'Key saved'}. Enter a new key to replace it`
-    : 'Paste your Immich API key';
-  const fromEnv = [urlFromEnv && 'address', keyFromEnv && 'API key'].filter(Boolean);
-  $('key-help').textContent = fromEnv.length
-    ? `The ${fromEnv.join(' and ')} ${fromEnv.length > 1 ? 'are' : 'is'} set by the container (environment variables) and can't be changed here.`
+  const keyLabel = config.immich_api_key_hint ? `Key ending in ${config.immich_api_key_hint}` : 'Key saved';
+  $('key').placeholder = !config.immich_api_key_set
+    ? 'Paste your Immich API key'
+    : keyFromEnv ? `${keyLabel}.` : `${keyLabel}. Enter a new key to replace it`;
+  const envVars = [urlFromEnv && 'IMMICH_BASE_URL', keyFromEnv && 'IMMICH_API_KEY'].filter(Boolean);
+  $('key-help').textContent = envVars.length
+    ? `Set by container environment variable${envVars.length > 1 ? 's' : ''} (${envVars.join(' & ')}).`
     : '';
-  show('key-help', fromEnv.length > 0);
+  show('key-help', envVars.length > 0);
   $('save-btn').textContent = saved ? 'Save changes' : 'Save';
   $('save-btn').disabled = urlFromEnv && keyFromEnv;
   show('save-anyway-btn', false);
   setMsg('immich-msg', '');
+  if (saved) checkImmich();
 }
 
 function immichBody(skipTest = false) {
@@ -427,7 +454,7 @@ function renderToken() {
   $('regen-btn').disabled = envToken;
   $('copy-token').disabled = !token;
   show('token-save', false); show('token-revert', false);
-  setMsg('token-msg', envToken ? 'Set by the container (FORGE_API_TOKEN), so it can\'t be changed here.' : '', 'warn');
+  setMsg('token-msg', envToken ? 'Set by container environment variable (FORGE_API_TOKEN).' : '', 'warn');
 }
 
 function revealToken() {
