@@ -35,6 +35,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import httpx
@@ -144,7 +145,10 @@ def _swap_immich_client(app_: FastAPI) -> None:
 
 # --- setup & management page ---
 
-_SETUP_PAGE = Path(__file__).parent / "static" / "setup.html"
+_STATIC = Path(__file__).parent / "static"
+_SETUP_PAGE = _STATIC / "setup.html"
+# The setup page's assets (icons). Public, like the page itself.
+app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
 
 class ImmichSignIn(BaseModel):

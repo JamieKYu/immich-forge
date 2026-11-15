@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forge for Immich — Server setup</title>
+<!-- Same "F" app icon as the Chrome extension (extension/public/icons/forge-active-*). -->
+<link rel="icon" type="image/png" sizes="16x16" href="/static/icons/forge-active-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/forge-active-32.png">
+<link rel="apple-touch-icon" href="/static/icons/forge-active-128.png">
 <style>
   :root {
     --bg: #14151a; --panel: #1d1f27; --border: #2c2f3a; --text: #e6e7eb;
@@ -78,9 +82,9 @@
     <!-- Default: the Immich address + API key this server is connected with. -->
     <form id="signin-immich-form">
       <p class="muted small">Sign in with your Immich URL and API key.</p>
-      <label for="signin-url">Immich address</label>
+      <label for="signin-url">Server address</label>
       <input id="signin-url" placeholder="http://192.168.1.50:2283" autocomplete="url" required>
-      <label for="signin-key">Immich API key</label>
+      <label for="signin-key">API key</label>
       <input id="signin-key" type="password" autocomplete="current-password" required>
       <p class="msg bad" id="signin-immich-msg" hidden></p>
       <div class="row">
@@ -105,14 +109,14 @@
 
   <!-- Immich connection: change any time -->
   <section id="immich" hidden>
-    <h2>Immich connection <span class="meta" id="immich-meta"></span></h2>
+    <h2>Immich server <span class="meta" id="immich-meta"></span></h2>
     <p class="muted small" id="immich-env" hidden></p>
     <p class="muted small" id="immich-intro">Forge needs your Immich address and an API key to read and save photos.</p>
     <form id="immich-form">
-      <label for="url">Immich address</label>
+      <label for="url">Server address</label>
       <input id="url" placeholder="http://192.168.1.50:2283" required>
 
-      <label for="key">Immich API key</label>
+      <label for="key">API key</label>
       <input id="key" type="password" autocomplete="off">
 
       <p class="msg" id="immich-msg" hidden></p>
@@ -129,7 +133,7 @@
     <h2>Forge token <span class="meta" id="token-meta"></span></h2>
     <p class="muted small" id="token-env" hidden>Set by container environment variable (FORGE_API_TOKEN).</p>
     <form id="token-form">
-      <label for="token-input">Token</label>
+      <label for="token-input">API token</label>
       <div class="token-wrap">
         <input id="token-input" type="password" autocomplete="off" spellcheck="false"
                placeholder="Generate one, or paste your own (16+ characters)">

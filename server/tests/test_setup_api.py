@@ -72,6 +72,15 @@ def test_page_is_served(client):
     assert r.status_code == 200 and "Forge for Immich" in r.text
 
 
+def test_page_favicon_is_served(client):
+    page = client.get("/").text
+    for size in (16, 32, 128):
+        path = f"/static/icons/forge-active-{size}.png"
+        assert path in page
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+
+
 def test_fresh_server_reports_setup_required(client):
     status = client.get("/setup/status").json()
     assert status["setup_required"] and not status["token_set"]
