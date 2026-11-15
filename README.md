@@ -48,7 +48,7 @@ See [`server/README.md`](server/README.md) and
 ```bash
 # 1. Forge server (GPU host with NVIDIA Container Toolkit)
 cd server
-cp .env.example .env          # set IMMICH_BASE_URL, IMMICH_API_KEY, FORGE_API_TOKEN
+cp .env.example .env          # optional settings; no credentials needed
 docker compose up --build
 
 # 2. Extension
@@ -57,9 +57,9 @@ npm install
 npm run build                 # load extension/dist as an unpacked extension in Chrome
 ```
 
-`FORGE_API_TOKEN` is **required** — the server fails closed (HTTP 503) without
-it, so the Immich proxy is never exposed unauthenticated. Generate one with
-`openssl rand -hex 32`.
+Then open `http://localhost:8000`: the setup page connects Immich and creates
+the Forge token you paste into the extension. Until setup is done the API fails
+closed (HTTP 503), so the Immich proxy is never exposed unauthenticated.
 
 The GPU pipeline ships with **classical-CV fallbacks** (Lanczos upscale, etc.) so
 the whole loop runs and is testable *before* you download the deep-learning model

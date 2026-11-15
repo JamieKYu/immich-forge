@@ -74,6 +74,33 @@ describe('asset() error handling', () => {
   })
 })
 
+describe('forge() errors', () => {
+  it("shows the server's reason, e.g. models still downloading", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        { detail: 'models still downloading (40%) — try again in a few minutes' },
+        { ok: false, status: 503 },
+      ),
+    )
+    await expect(new ForgeClient(settings()).forge('a1', DEFAULT_OPERATIONS)).rejects.toThrow(
+      'Models still downloading (40%) — try again in a few minutes',
+    )
+  })
+
+  it('falls back to a generic message for a non-JSON error', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new Error('not json')
+      },
+    } as unknown as Response)
+    await expect(new ForgeClient(settings()).forge('a1', DEFAULT_OPERATIONS)).rejects.toThrow(
+      'forge failed (HTTP 502)',
+    )
+  })
+})
+
 describe('forge()', () => {
   it('POSTs asset id + operations as JSON', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ job_id: 'j1' }))

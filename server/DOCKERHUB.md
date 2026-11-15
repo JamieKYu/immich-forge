@@ -17,20 +17,9 @@ You will also need the **[Forge for Immich](https://chromewebstore.google.com/de
 
 ## Getting started
 
-### Step 1 — Gather three things
+### Step 1 — Start the server
 
-1. **Immich IP address.** The address you open Immich at, e.g. `http://192.168.1.50:2283`.
-   <br>⚠️ Use the computer's **network IP address**, not `localhost`
-<br>
-2. **Immich API key.** In Immich: **your avatar (top-right) → Account Settings → API Keys → New API Key**. Copy it.
-<br>
-3. **Forge token** — a password you make up, so only you can use your Forge server. Generate one and **save it**; you'll paste it into the extension too:
-   - **Mac / Linux:** `openssl rand -hex 32`
-   - **Windows (PowerShell):** `[guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")`
-
-### Step 2 — Start the server
-
-Pick the command for your computer and replace the three `paste-` with values from step 1.
+Pick the command for your computer. There's nothing to fill in: you'll connect Immich in step 2.
 
 #### 🐧 Linux with an NVIDIA GPU (recommended)
 
@@ -38,9 +27,6 @@ Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-
 
 ```bash
 docker run -d --name immich-forge --gpus all -p 8000:8000 \
-  -e IMMICH_BASE_URL=http://paste-your-immich-ip:2283 \
-  -e IMMICH_API_KEY=paste-your-immich-api-key \
-  -e FORGE_API_TOKEN=paste-your-forge-token \
   -v immich-forge-weights:/app/weights \
   --restart unless-stopped \
   jamiekyu/immich-forge:latest
@@ -53,9 +39,6 @@ Use [Docker Desktop](https://www.docker.com/products/docker-desktop/) (WSL 2 bac
 In PowerShell:
 ```powershell
 docker run -d --name immich-forge --gpus all -p 8000:8000 `
-  -e IMMICH_BASE_URL=http://paste-your-immich-ip:2283 `
-  -e IMMICH_API_KEY=paste-your-immich-api-key `
-  -e FORGE_API_TOKEN=paste-your-forge-token `
   -v immich-forge-weights:/app/weights `
   --restart unless-stopped `
   jamiekyu/immich-forge:latest
@@ -71,9 +54,6 @@ The image is built for Intel/AMD (`linux/amd64`) because it uses NVIDIA's CUDA. 
 ```bash
 docker run -d --name immich-forge --platform linux/amd64 -p 8000:8000 \
   -e FORGE_DEVICE=cpu \
-  -e IMMICH_BASE_URL=http://paste-your-immich-ip:2283 \
-  -e IMMICH_API_KEY=paste-your-immich-api-key \
-  -e FORGE_API_TOKEN=paste-your-forge-token \
   -v immich-forge-weights:/app/weights \
   --restart unless-stopped \
   jamiekyu/immich-forge:latest
@@ -88,30 +68,33 @@ Drop `--gpus all` and add `FORGE_DEVICE=cpu`. Runs on the CPU, so may be slow:
 ```bash
 docker run -d --name immich-forge -p 8000:8000 \
   -e FORGE_DEVICE=cpu \
-  -e IMMICH_BASE_URL=http://paste-your-immich-ip:2283 \
-  -e IMMICH_API_KEY=paste-your-immich-api-key \
-  -e FORGE_API_TOKEN=paste-your-forge-token \
   -v immich-forge-weights:/app/weights \
   --restart unless-stopped \
   jamiekyu/immich-forge:latest
 ```
 
-### Step 3 — Check it's running
+### Step 2 — Open the setup page
 
-On first start Forge downloads its AI models (**about 2.3 GB**, once). Watch progress:
+In your browser, go to **`http://YOUR_FORGE_IP:8000`** (or `http://localhost:8000` on the same computer).
 
-```bash
-docker logs -f immich-forge
-```
+- **AI models** download in the background on first start (**about 2.3 GB**, once). The page shows their progress; you can carry on with setup meanwhile.
+- **Connect to Immich:**
+  1. **Immich address** — the address you open Immich at, e.g. `http://192.168.1.50:2283`.
+     <br>⚠️ Use the computer's **network IP address**, not `localhost`
+  2. **Immich API key** — in Immich: **your avatar (top-right) → Account Settings → API Keys → New API Key**. Copy it.
+  3. Click **Test connection**, then **Save**.
+- **Copy your Forge token.** Forge creates one when you save (or paste your own, 16+ characters) — you'll paste it into the extension.
 
-It's ready when you see `forge ready` and `Uvicorn running on http://0.0.0.0:8000` (press Ctrl+C to stop watching; the server keeps running).
+Come back to the same address any time — sign in with your Immich address and API key — to change the Immich connection, copy the token, or make a new one.
 
-### Step 4 — Connect the Chrome extension
+### Step 3 — Connect the Chrome extension
 
 1. Install **[Forge for Immich](https://chromewebstore.google.com/detail/forge-for-immich/ceaoooljelkcaagcljambkdldadpblgc)** from the Chrome Web Store.
 2. Click the Forge toolbar icon → **Set up Forge server**.
-3. Enter the **server address** — `http://YOUR_FORGE_IP:8000` (or `http://localhost:8000` if Forge runs on the same computer as your browser) — and your **Forge token** from step 1, then click **Save & test**. Allow access when Chrome asks.
+3. Enter the **server address** — `http://YOUR_FORGE_IP:8000` (or `http://localhost:8000` if Forge runs on the same computer as your browser) — and your **Forge token** from step 2, then click **Save & test**. Allow access when Chrome asks.
 4. Open any photo in Immich and click the Forge icon. 🎉
+
+Forging starts working once the AI models have finished downloading.
 
 ---
 
@@ -125,7 +108,7 @@ It's ready when you see `forge ready` and `Uvicorn running on http://0.0.0.0:800
 
 ## docker compose
 
-Save as `docker-compose.yml`, fill in your values, and run `docker compose up -d`:
+Save as `docker-compose.yml`, run `docker compose up -d`, then continue from step 2 above:
 
 ```yaml
 services:
@@ -135,10 +118,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      IMMICH_BASE_URL: http://paste-your-immich-ip:2283
-      IMMICH_API_KEY: paste-your-immich-api-key
-      FORGE_API_TOKEN: paste-your-forge-token
-      # FORGE_DEVICE: cpu            # uncomment if you have no NVIDIA GPU
+      FORGE_DEVICE: cuda             # change to cpu if you have no NVIDIA GPU
     volumes:
       - immich-forge-weights:/app/weights
     # Delete this "deploy" block if you have no NVIDIA GPU:
@@ -163,14 +143,17 @@ volumes:
 | --- | --- |
 | `no matching manifest for linux/arm64/v8` | You're on an Apple Silicon Mac. Add `--platform linux/amd64` (see step 2). |
 | *"The requested image's platform (linux/amd64) does not match…"* warning | Harmless on Apple Silicon — it's running through emulation. Add `--platform linux/amd64` to silence it. |
-| `/health` says `"immich": false` | Forge can't reach Immich. Check `IMMICH_BASE_URL` uses your Immich computer's **IP address** (not `localhost`) and port `2283`, then recreate the container. |
-| Extension says **token rejected** | The token in the extension must exactly match `FORGE_API_TOKEN`. |
-| Extension says the server has **no token set** (HTTP 503) | `FORGE_API_TOKEN` is empty. Forge refuses all requests until it's set — this keeps your library private. |
+| The setup page won't open | Check the container is running (`docker ps`) and you're using port `8000`. From another computer, use the Forge machine's IP, not `localhost`. |
+| **Test connection** can't reach Immich | Use your Immich computer's **IP address** (not `localhost` — inside the container that means the container itself) and port `2283`. |
+| Extension says the server **isn't set up yet** | Finish step 2 on the setup page. Until then Forge refuses all requests — this keeps your library private. |
+| Extension says **token rejected** | Paste the Forge token again. If you made a new one on the setup page, the old one stopped working. |
+| **Lost your Forge token** | Sign in to the setup page with your Immich address and API key and copy it from there. Or run `docker exec immich-forge python -m app.reset_token` to make a new one. |
+| Forging says **models still downloading** | Wait for the download to finish — progress is on the setup page. If a download failed, click **Retry** there. |
 | Extension **can't reach** the server | Check the container is running (`docker ps`), the address uses port `8000`, and no firewall blocks it. From another computer, use the Forge machine's IP, not `localhost`. |
 | `"cuda_available": false` on an NVIDIA machine | Add `--gpus all` (or the compose `deploy` block), and install the NVIDIA Container Toolkit on Linux. |
 | Out of GPU memory | Lower `FORGE_TILE_SIZE` to `256`, and `FORGE_LOW_LIGHT_MAX_PIXELS` to `2000000`. |
-| Auto says **"face detection unavailable"** | The face model is missing from the weights volume. Restart the container so it downloads, or check the logs for a failed download. |
-| Changed a setting but nothing happened | Settings are read at start: recreate the container (`docker rm -f` + run again, or `docker compose up -d`). A plain `docker restart` keeps the old settings. |
+| Auto says **"face detection unavailable"** | The face model hasn't downloaded. Check the setup page, and click **Retry** if it failed. |
+| Changed a `-e` setting but nothing happened | Environment settings are read at start: recreate the container (`docker rm -f` + run again, or `docker compose up -d`). A plain `docker restart` keeps the old settings. (Changes on the setup page apply straight away.) |
 
 ---
 
@@ -182,10 +165,15 @@ Set these with `-e NAME=value` (or under `environment:` in compose).
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `IMMICH_BASE_URL` | `http://immich-server:2283` | Your Immich address. **Set this.** |
-| `IMMICH_API_KEY` | _(empty)_ | Your Immich API key. **Set this.** |
-| `FORGE_API_TOKEN` | _(empty)_ | The token the extension must send. **Required** — when empty, Forge refuses all requests (HTTP 503). |
 | `FORGE_DEVICE` | `cuda` | `cuda` (NVIDIA GPU) or `cpu`. |
+
+**Connection (optional)** — normally set on the setup page. If you set them here instead, they're used as-is and shown on the page as read-only (handy for scripted installs).
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `IMMICH_BASE_URL` | _(set on the page)_ | Your Immich address. |
+| `IMMICH_API_KEY` | _(set on the page)_ | Your Immich API key. |
+| `FORGE_API_TOKEN` | _(created on the page)_ | The token the extension must send. Until one exists, Forge refuses all requests. |
 
 **Performance and limits**
 
@@ -220,6 +208,6 @@ Set these with `-e NAME=value` (or under `environment:` in compose).
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `FORGE_SKIP_WEIGHT_DOWNLOAD` | `0` | `1` skips the model download at start (for offline hosts with a pre-filled weights volume). |
-| `FORGE_WEIGHTS_DIR` | `weights` | Where the AI models are stored inside the container (`/app/weights`). Keep the volume mounted there. |
+| `FORGE_SKIP_WEIGHT_DOWNLOAD` | `0` | `1` skips the model download (for offline hosts with a pre-filled weights volume). Forging then doesn't wait for downloads. |
+| `FORGE_WEIGHTS_DIR` | `weights` | Where the AI models — and the setup page's saved settings — are stored inside the container (`/app/weights`). Keep the volume mounted there, or your setup is lost when the container is recreated. |
 | `FORGE_CORS_ORIGINS` | _(empty)_ | Leave empty. The extension doesn't need it; set only for a custom web client. |

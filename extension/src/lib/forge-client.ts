@@ -38,7 +38,14 @@ export class ForgeClient {
     return h
   }
 
-  async health(): Promise<{ ok: boolean; immich: boolean; gpu: unknown }> {
+  // `setup_required` / `models`: servers with the setup page (older ones omit them).
+  async health(): Promise<{
+    ok: boolean
+    immich: boolean
+    gpu: unknown
+    setup_required?: boolean
+    models?: { state: string; done_bytes: number; total_bytes: number }
+  }> {
     const r = await fetch(`${this.base}/health`)
     if (!r.ok) throw new Error(`health ${r.status}`)
     return r.json()
@@ -110,7 +117,7 @@ export class ForgeClient {
       headers: this.headers({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ asset_id: assetId, operations }),
     })
-    if (!r.ok) throw new Error(`forge ${r.status}: ${await r.text()}`)
+    if (!r.ok) throw new Error(await errorDetail(r, 'forge'))
     return r.json()
   }
 
@@ -136,6 +143,18 @@ export class ForgeClient {
     if (!r.ok) throw new Error(`accept ${r.status}: ${await r.text()}`)
     return r.json()
   }
+}
+
+// The server's `detail` message (e.g. "models still downloading (40%) — try
+// again in a few minutes"), or a generic one for a non-JSON error.
+async function errorDetail(r: Response, what: string): Promise<string> {
+  try {
+    const detail = (await r.json())?.detail
+    if (typeof detail === 'string' && detail) return detail.charAt(0).toUpperCase() + detail.slice(1)
+  } catch {
+    /* non-json body */
+  }
+  return `${what} failed (HTTP ${r.status})`
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {

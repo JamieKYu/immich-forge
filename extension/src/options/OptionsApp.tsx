@@ -117,12 +117,15 @@ function ServerForm({
   const [showToken, setShowToken] = useState(false)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
+  // Set when the server needs its own setup first: links to its setup page.
+  const [setupUrl, setSetupUrl] = useState<string | null>(null)
 
 
   async function save(skipTest: boolean) {
     const forgeUrl = url.trim().replace(/\/+$/, '')
     const forgeToken = token.trim()
     setFailure(null)
+    setSetupUrl(null)
     if (!isValidForgeUrl(forgeUrl)) {
       setFailure('Enter a full address, e.g. http://gpu-host:8000')
       return
@@ -138,6 +141,7 @@ function ServerForm({
         const result = await testConnection(forgeUrl, forgeToken)
         if (!result.ok) {
           setFailure(result.message)
+          if (result.kind === 'setup-required') setSetupUrl(forgeUrl)
           return
         }
       }
@@ -185,7 +189,19 @@ function ServerForm({
         </button>
       </div>
 
-      {failure && <p className="error">{failure}</p>}
+      {failure && (
+        <p className="error">
+          {failure}
+          {setupUrl && (
+            <>
+              {' '}
+              <a href={setupUrl} target="_blank" rel="noopener">
+                Open server setup
+              </a>
+            </>
+          )}
+        </p>
+      )}
 
       <div className="row" style={{ marginTop: 14 }}>
         <button type="submit" className="primary" disabled={busy || !url.trim()}>
@@ -241,11 +257,29 @@ function StatusDetail({
     )
   }
   const r = status.result
-  if (!r.ok) return <p className="error">{r.message}</p>
+  if (!r.ok) {
+    return (
+      <p className="error">
+        {r.message}
+        {r.kind === 'setup-required' && (
+          <>
+            {' '}
+            <a href={forgeUrl} target="_blank" rel="noopener">
+              Open server setup
+            </a>
+          </>
+        )}
+      </p>
+    )
+  }
   if (!r.immich) {
     return (
       <p className="note">
-        Connected, but the server can't reach Immich. Check its IMMICH_BASE_URL and IMMICH_API_KEY.
+        Connected, but the server can't reach Immich. Check the Immich connection on the{' '}
+        <a href={forgeUrl} target="_blank" rel="noopener">
+          server's setup page
+        </a>
+        .
       </p>
     )
   }

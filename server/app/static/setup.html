@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forge for Immich — Server setup</title>
+<!-- Same "F" app icon as the Chrome extension (extension/public/icons/forge-active-*). -->
+<link rel="icon" type="image/png" sizes="16x16" href="/static/icons/forge-active-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/forge-active-32.png">
+<link rel="apple-touch-icon" href="/static/icons/forge-active-128.png">
+<style>
+  :root {
+    --bg: #14151a; --panel: #1d1f27; --border: #2c2f3a; --text: #e6e7eb;
+    --muted: #9aa0ad; --accent: #4f7cff; --ok: #29b765; --warn: #e6c07b; --bad: #ff6b6b;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans-serif; }
+  main { max-width: 600px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 22px; }
+  .top .link { margin-top: 4px; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
+  h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  h2 .meta { font-size: 12px; font-weight: 400; color: var(--muted); }
+  h2 .meta.ready { color: var(--ok); }
+  h2 .meta.not-ready { color: var(--bad); }
+  label { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 12px; }
+  input { width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
+  input[readonly] { color: var(--muted); }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text); border-radius: 7px; height: 32px; padding: 0 14px; }
+  button.primary { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  button.link { border: none; background: none; height: auto; padding: 0; color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .msg { margin: 10px 0 0; font-size: 13px; }
+  .msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); } .msg.warn { color: var(--warn); }
+  .bar { height: 6px; border-radius: 4px; background: var(--bg); overflow: hidden; margin: 6px 0 12px; }
+  .bar > div { height: 100%; background: var(--accent); transition: width .4s; }
+  .bar.done > div { background: var(--ok); }
+  .files { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .files li { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; padding: 3px 0; align-items: center; }
+  .files .err { grid-column: 2 / 4; color: var(--bad); font-size: 12px; }
+  .token { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all;
+           background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-top: 8px; }
+  .note { font-size: 13px; color: var(--warn); background: rgba(230,192,123,.1); border: 1px solid rgba(230,192,123,.25); border-radius: 7px; padding: 8px 10px; margin-top: 10px; }
+  ol { margin: 8px 0 0; padding-left: 20px; } ol li { margin: 4px 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  a { color: var(--accent); }
+  .token-wrap { position: relative; }
+  .token-wrap input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding-right: 64px; }
+  .token-wrap .reveal { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); height: 26px; padding: 0 9px; font-size: 12px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div>
+      <h1>Forge for Immich</h1>
+      <p class="sub">Server setup</p>
+    </div>
+    <button class="link" id="signout" hidden>Sign out</button>
+  </header>
+
+  <!-- Model downloads: always visible -->
+  <section id="models" hidden>
+    <h2>AI models <span class="meta" id="models-meta">…</span></h2>
+    <div class="bar" id="models-bar"><div style="width:0"></div></div>
+    <ul class="files" id="models-files"></ul>
+    <div class="row" id="models-retry" hidden>
+      <button id="retry-btn">Retry failed downloads</button>
+    </div>
+  </section>
+
+  <!-- Sign in: the server is set up and this tab isn't signed in -->
+  <section id="signin" hidden>
+    <h2>Sign in</h2>
+    <!-- Default: the Immich address + API key this server is connected with. -->
+    <form id="signin-immich-form">
+      <p class="muted small">Sign in with your Immich URL and API key.</p>
+      <label for="signin-url">Server address</label>
+      <input id="signin-url" placeholder="http://192.168.1.50:2283" autocomplete="url" required>
+      <label for="signin-key">API key</label>
+      <input id="signin-key" type="password" autocomplete="current-password" required>
+      <p class="msg bad" id="signin-immich-msg" hidden></p>
+      <div class="row">
+        <button class="primary" type="submit">Sign in</button>
+        <button type="button" class="link" id="use-token">Use your Forge token instead</button>
+      </div>
+    </form>
+    <!-- Fallback: the Forge token (e.g. Immich not connected, or the key was replaced in Immich). -->
+    <form id="signin-token-form" hidden>
+      <p class="muted small" id="signin-token-intro">Sign in with your server's Forge token.</p>
+      <label for="signin-token">Forge token</label>
+      <input id="signin-token" type="password" autocomplete="off" required>
+      <p class="msg bad" id="signin-token-msg" hidden></p>
+      <div class="row">
+        <button class="primary" type="submit">Sign in</button>
+        <button type="button" class="link" id="use-immich">Use your Immich API key instead</button>
+      </div>
+      <p class="muted small" style="margin-top:14px"><b>Lost the token?</b><br>
+        Make a new one by running <code>docker exec &lt;container-name&gt; python -m app.reset_token</code></p>
+    </form>
+  </section>
+
+  <!-- Immich connection: change any time -->
+  <section id="immich" hidden>
+    <h2>Immich server <span class="meta" id="immich-meta"></span></h2>
+    <p class="muted small" id="immich-env" hidden></p>
+    <p class="muted small" id="immich-intro">Forge needs your Immich address and an API key to read and save photos.</p>
+    <form id="immich-form">
+      <label for="url">Server address</label>
+      <input id="url" placeholder="http://192.168.1.50:2283" required>
+
+      <label for="key">API key</label>
+      <input id="key" type="password" autocomplete="off">
+
+      <p class="msg" id="immich-msg" hidden></p>
+      <div class="row">
+        <button type="button" id="test-btn">Test connection</button>
+        <button class="primary" type="submit" id="save-btn">Save</button>
+        <button type="button" id="save-anyway-btn" hidden>Save anyway</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Forge token: paste your own, copy, or generate any time -->
+  <section id="token" hidden>
+    <h2>Forge token <span class="meta" id="token-meta"></span></h2>
+    <p class="muted small" id="token-env" hidden>Set by container environment variable (FORGE_API_TOKEN).</p>
+    <form id="token-form">
+      <label for="token-input">API token</label>
+      <div class="token-wrap">
+        <input id="token-input" type="password" autocomplete="off" spellcheck="false"
+               placeholder="Generate one, or paste your own (16+ characters)">
+        <button type="button" class="reveal" id="token-reveal">Show</button>
+      </div>
+      <p class="msg" id="token-msg" hidden></p>
+      <div class="row">
+        <button type="button" id="copy-token">Copy</button>
+        <button type="button" id="regen-btn">Generate new token</button>
+        <button class="primary" type="submit" id="token-save" hidden>Save token</button>
+        <button type="button" id="token-revert" hidden>Cancel</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="extension" hidden>
+    <h2>Connect the Chrome extension</h2>
+    <ol>
+      <li>Install <a href="https://chromewebstore.google.com/detail/forge-for-immich/ceaoooljelkcaagcljambkdldadpblgc" target="_blank" rel="noopener">Forge for Immich</a> from the Chrome Web Store.</li>
+      <li>Click the Forge toolbar icon → <b>Set up Forge server</b>.</li>
+      <li>Server address: <code id="server-address"></code></li>
+      <li>API token: your Forge token above.</li>
+      <li>Click <b>Save &amp; test</b>.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const show = (id, on = true) => { $(id).hidden = !on; };
+const TOKEN_KEY = 'forgeToken';
+let token = sessionStorage.getItem(TOKEN_KEY) || '';  // the server's current token, as this tab knows it
+let status = null;     // GET /setup/status
+let config = null;     // GET /setup/config
+let pollTimer = null;
+
+function remember(t) {
+  token = t;
+  if (t) sessionStorage.setItem(TOKEN_KEY, t); else sessionStorage.removeItem(TOKEN_KEY);
+}
+
+async function api(path, { method = 'GET', body } = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  let data = null;
+  try { data = await r.json(); } catch { /* empty body */ }
+  if (!r.ok) {
+    const err = new Error((data && data.detail) || `HTTP ${r.status}`);
+    err.status = r.status;
+    throw err;
+  }
+  return data;
+}
+
+function setMsg(id, text, kind) {
+  const el = $(id);
+  el.textContent = text || '';
+  el.className = `msg ${kind || ''}`;
+  el.hidden = !text;
+}
+
+// navigator.clipboard only exists on secure origins (https or localhost), and
+// this page is usually opened at http://<lan-ip>:8000 — fall back to a hidden
+// textarea + execCommand there.
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      /* e.g. "Document is not focused" — fall back below */
+    }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  ta.remove();
+  if (!ok) throw new Error('Copy failed: select the token and copy it by hand.');
+}
+
+function gb(bytes) {
+  return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
+}
+
+// --- models -------------------------------------------------------------
+
+function renderModels(m) {
+  const pct = m.total_bytes ? Math.round((100 * m.done_bytes) / m.total_bytes) : 0;
+  const meta = {
+    ready: 'ready',
+    downloading: `Downloading · ${gb(m.done_bytes)} / ${gb(m.total_bytes)} · ${pct}%`,
+    failed: 'Some downloads failed',
+    skipped: 'Downloads turned off (FORGE_SKIP_WEIGHT_DOWNLOAD)',
+  }[m.state] || m.state;
+  $('models-meta').textContent = meta;
+  $('models-meta').classList.toggle('ready', m.state === 'ready');
+  $('models-bar').firstElementChild.style.width = `${m.state === 'ready' ? 100 : pct}%`;
+  $('models-bar').classList.toggle('done', m.state === 'ready');
+  $('models-files').innerHTML = '';
+  for (const f of m.files) {
+    const li = document.createElement('li');
+    const icon = { done: '✓', downloading: '⟳', waiting: '·', failed: '✕' }[f.state];
+    const right = f.state === 'downloading'
+      ? `${Math.round((100 * f.done_bytes) / Math.max(1, f.total_bytes))}% of ${gb(f.total_bytes)}`
+      : f.state === 'waiting' ? `${gb(f.total_bytes)} · waiting` : gb(f.total_bytes);
+    li.innerHTML = `<span></span><span></span><span class="muted"></span>`;
+    li.children[0].textContent = icon;
+    li.children[0].style.color = f.state === 'done' ? 'var(--ok)' : f.state === 'failed' ? 'var(--bad)' : '';
+    li.children[1].textContent = f.label;
+    li.children[2].textContent = right;
+    if (f.error) {
+      const err = document.createElement('span');
+      err.className = 'err';
+      err.textContent = f.error;
+      li.appendChild(err);
+    }
+    $('models-files').appendChild(li);
+  }
+  show('models-retry', m.state === 'failed');
+}
+
+async function pollStatus() {
+  clearTimeout(pollTimer);
+  try {
+    status = await api('/setup/status');
+  } catch {
+    pollTimer = setTimeout(pollStatus, 5000);
+    return null;
+  }
+  renderModels(status.models);
+  // Fast while downloading, slow once settled.
+  pollTimer = setTimeout(pollStatus, status.models.state === 'downloading' ? 1500 : 15000);
+  return status;
+}
+
+$('retry-btn').onclick = async () => {
+  try { renderModels(await api('/setup/models/retry', { method: 'POST' })); pollStatus(); }
+  catch (e) { alert(e.message); }
+};
+
+// --- page state ------------------------------------------------------------
+
+async function route() {
+  if (!(await pollStatus())) return;
+  for (const id of ['signin', 'models', 'immich', 'token', 'extension', 'signout']) show(id, false);
+
+  if (status.token_set && !token) { showSignIn(); return; }
+  if (status.token_set) {
+    try {
+      config = await api('/setup/config');
+    } catch (e) {
+      if (e.status === 401) { remember(''); showSignIn(); return; }
+      throw e;
+    }
+  } else {
+    // First run: anyone who reaches the page can set it up.
+    config = await api('/setup/config');
+    remember('');
+  }
+  // First run starts with just the Immich connection; the token section
+  // appears once there's a token (created when Immich is saved).
+  const firstRun = !status.token_set
+  renderImmich();
+  $('server-address').textContent = location.origin;
+  show('signout', !!token);
+  show('models');
+  show('immich');
+  if (!firstRun) {
+    renderToken();
+    show('token'); show('extension');
+  }
+}
+
+// --- sign in ------------------------------------------------------------------
+
+function showSignIn() {
+  // Signed out: nothing but the sign-in form (no model progress either).
+  // Immich sign-in needs a saved connection; otherwise only the token works.
+  signInWith(status.immich_configured ? 'immich' : 'token');
+  show('use-immich', status.immich_configured);
+  show('signin');
+}
+
+function signInWith(mode) {
+  show('signin-immich-form', mode === 'immich');
+  show('signin-token-form', mode === 'token');
+  setMsg('signin-immich-msg', ''); setMsg('signin-token-msg', '');
+  $(mode === 'immich' ? 'signin-url' : 'signin-token').focus();
+}
+$('use-token').onclick = () => signInWith('token');
+$('use-immich').onclick = () => signInWith('immich');
+
+$('signin-immich-form').onsubmit = async (ev) => {
+  ev.preventDefault();
+  setMsg('signin-immich-msg', '');
+  try {
+    const r = await api('/setup/signin', {
+      method: 'POST',
+      body: { immich_base_url: $('signin-url').value.trim(), immich_api_key: $('signin-key').value.trim() },
+    });
+    $('signin-key').value = '';
+    remember(r.token);
+    route();
+  } catch (e) { setMsg('signin-immich-msg', e.message, 'bad'); }
+};
+
+$('signin-token-form').onsubmit = async (ev) => {
+  ev.preventDefault();
+  remember($('signin-token').value.trim());
+  $('signin-token').value = '';
+  try {
+    await api('/setup/config');
+    route();
+  } catch (e) {
+    remember('');
+    setMsg('signin-token-msg', e.status === 401 ? 'That token isn\'t right.' : e.message, 'bad');
+  }
+};
+$('signout').onclick = () => { remember(''); route(); };
+
+// --- Immich connection -------------------------------------------------------
+
+function setImmichStatus(text, kind) {
+  $('immich-meta').textContent = text;
+  $('immich-meta').classList.toggle('ready', kind === 'ready');
+  $('immich-meta').classList.toggle('not-ready', kind === 'not-ready');
+}
+
+// "Ready" means Immich actually answers with the saved address and key — not
+// just that something was saved (Save anyway can store a key Immich rejects).
+let immichCheck = 0;
+async function checkImmich() {
+  const run = ++immichCheck;
+  setImmichStatus('checking…', '');
+  let result;
+  try {
+    // No key in the body: the server tests the saved one.
+    result = await api('/setup/test', { method: 'POST', body: { immich_base_url: config.immich_base_url } });
+  } catch (e) {
+    result = { ok: false, message: e.message };
+  }
+  if (run !== immichCheck) return;  // a newer check started meanwhile
+  setImmichStatus(result.ok ? 'ready' : 'not ready', result.ok ? 'ready' : 'not-ready');
+  if (!result.ok) setMsg('immich-msg', result.message, 'bad');
+  else if (immichFromEnv()) setMsg('immich-msg', `✓ Connected to Immich as ${result.user}.`, 'ok');
+}
+
+// Both the address and key come from the container: nothing to edit or save.
+function immichFromEnv() {
+  return !!(config && config.from_env.immich_base_url && config.from_env.immich_api_key);
+}
+
+
+function renderImmich() {
+  const saved = status.immich_configured;
+  setImmichStatus('', '');
+  show('immich-intro', !saved);
+  $('url').value = config.immich_base_url || $('url').value;
+  const urlFromEnv = config.from_env.immich_base_url;
+  const keyFromEnv = config.from_env.immich_api_key;
+  $('url').readOnly = urlFromEnv;
+  $('key').readOnly = keyFromEnv;
+  $('key').value = '';
+  $('key').required = !config.immich_api_key_set;
+  const keyLabel = config.immich_api_key_hint ? `Key ending in ${config.immich_api_key_hint}` : 'Key saved';
+  $('key').placeholder = !config.immich_api_key_set
+    ? 'Paste your Immich API key'
+    : keyFromEnv ? `${keyLabel}.` : `${keyLabel}. Enter a new key to replace it`;
+  const envVars = [urlFromEnv && 'IMMICH_BASE_URL', keyFromEnv && 'IMMICH_API_KEY'].filter(Boolean);
+  $('immich-env').textContent = envVars.length
+    ? `Set by container environment variable${envVars.length > 1 ? 's' : ''} (${envVars.join(' & ')}).`
+    : '';
+  show('immich-env', envVars.length > 0);
+  // Nothing to save when both come from the environment.
+  show('save-btn', !immichFromEnv());
+  show('save-anyway-btn', false);
+  setMsg('immich-msg', '');
+  if (saved) checkImmich();
+}
+
+function immichBody(skipTest = false) {
+  return { immich_base_url: $('url').value.trim(), immich_api_key: $('key').value.trim() || null, skip_test: skipTest };
+}
+
+$('test-btn').onclick = async () => {
+  setMsg('immich-msg', 'Testing…', '');
+  try {
+    const r = await api('/setup/test', { method: 'POST', body: immichBody() });
+    setMsg('immich-msg', r.ok ? `✓ Connected to Immich as ${r.user}.` : r.message, r.ok ? 'ok' : 'bad');
+  } catch (e) { setMsg('immich-msg', e.message, 'bad'); }
+};
+
+async function saveImmich(skipTest) {
+  setMsg('immich-msg', skipTest ? 'Saving…' : 'Testing and saving…', '');
+  show('save-anyway-btn', false);
+  try {
+    const r = await api('/setup/immich', { method: 'POST', body: immichBody(skipTest) });
+    if (r.token) remember(r.token);  // first run: a token was created to protect the page
+    await route();
+    setMsg('immich-msg', '✓ Saved', 'ok');
+    if (r.token) {
+      revealToken();
+      setMsg('token-msg', 'Copy your new Forge token, or paste your own instead.', 'ok');
+    }
+  } catch (e) {
+    setMsg('immich-msg', e.message, 'bad');
+    if (e.status === 400) show('save-anyway-btn');
+  }
+}
+$('immich-form').onsubmit = (ev) => { ev.preventDefault(); saveImmich(false); };
+$('save-anyway-btn').onclick = () => saveImmich(true);
+
+// --- Forge token -------------------------------------------------------------
+
+function renderToken() {
+  const envToken = config.from_env.forge_api_token;
+  $('token-meta').textContent = token ? 'ready' : '';
+  $('token-meta').classList.toggle('ready', !!token);
+  $('token-input').value = token;
+  $('token-input').readOnly = envToken;
+  $('token-input').type = 'password';
+  $('token-reveal').textContent = 'Show';
+  $('regen-btn').disabled = envToken;
+  $('copy-token').disabled = !token;
+  show('token-save', false); show('token-revert', false);
+  show('token-env', envToken);
+  setMsg('token-msg', '');
+}
+
+function revealToken() {
+  $('token-input').type = 'text';
+  $('token-reveal').textContent = 'Hide';
+}
+
+$('token-reveal').onclick = () => {
+  const hidden = $('token-input').type === 'password';
+  $('token-input').type = hidden ? 'text' : 'password';
+  $('token-reveal').textContent = hidden ? 'Hide' : 'Show';
+};
+
+// Typing or pasting a different token offers to save it.
+$('token-input').oninput = () => {
+  const edited = $('token-input').value.trim() !== token;
+  show('token-save', edited);
+  show('token-revert', edited && !!token);
+  $('copy-token').disabled = !$('token-input').value.trim();
+  setMsg('token-msg', edited && token ? 'Saving a new token means pasting it into the extension too.' : '', 'warn');
+};
+$('token-revert').onclick = () => renderToken();
+
+$('token-form').onsubmit = async (ev) => {
+  ev.preventDefault();
+  try {
+    const r = await api('/setup/token', { method: 'POST', body: { token: $('token-input').value.trim() } });
+    remember(r.token);
+    await route();
+    revealToken();
+    setMsg('token-msg', '✓ Token saved. Use the same token in the extension.', 'ok');
+  } catch (e) { setMsg('token-msg', e.message, 'bad'); }
+};
+
+$('copy-token').onclick = async () => {
+  try {
+    await copyText($('token-input').value.trim());
+    setMsg('token-msg', '✓ Copied', 'ok');
+  } catch (e) { setMsg('token-msg', e.message, 'bad'); }
+};
+
+async function generateToken() {
+  try {
+    const r = await api('/setup/token', { method: 'POST' });
+    remember(r.token);
+    await route();
+    revealToken();
+    setMsg('token-msg', '✓ New server token created', 'ok');
+  } catch (e) { setMsg('token-msg', e.message, 'bad'); }
+}
+$('regen-btn').onclick = () => generateToken();
+
+route();
+</script>
+</body>
+</html>

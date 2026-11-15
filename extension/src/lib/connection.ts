@@ -10,7 +10,13 @@ export type ConnectionResult =
   | { ok: true; immich: boolean; models: ModelsInfo }
   | {
       ok: false
-      kind: 'invalid-url' | 'unreachable' | 'unauthorized' | 'server-token-unset' | 'error'
+      kind:
+        | 'invalid-url'
+        | 'unreachable'
+        | 'setup-required'
+        | 'unauthorized'
+        | 'server-token-unset'
+        | 'error'
       message: string
     }
 
@@ -39,7 +45,17 @@ export async function testConnection(
   // /health needs no token: it tells us the server is there at all.
   let immich: boolean
   try {
-    immich = (await client.health()).immich
+    const health = await client.health()
+    immich = health.immich
+    if (health.setup_required) {
+      // A fresh server: Immich and the token are set on its own setup page.
+      return {
+        ok: false,
+        kind: 'setup-required',
+        message:
+          "This Forge server isn't set up yet. Open it in your browser to connect Immich and get a token.",
+      }
+    }
   } catch {
     return {
       ok: false,
@@ -58,6 +74,7 @@ export async function testConnection(
       return { ok: false, kind: 'unauthorized', message: 'The server rejected this API token.' }
     }
     if (status === 503) {
+      // Servers from before the setup page.
       return {
         ok: false,
         kind: 'server-token-unset',
