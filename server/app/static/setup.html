@@ -22,7 +22,6 @@
   h2 .meta { font-size: 12px; font-weight: 400; color: var(--muted); }
   h2 .meta.ready { color: var(--ok); }
   h2 .meta.not-ready { color: var(--bad); }
-  .env-note { color: var(--warn); }
   label { display: block; margin: 12px 0 4px; color: var(--muted); font-size: 12px; }
   input { width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
   input[readonly] { color: var(--muted); }
@@ -107,6 +106,7 @@
   <!-- Immich connection: change any time -->
   <section id="immich" hidden>
     <h2>Immich connection <span class="meta" id="immich-meta"></span></h2>
+    <p class="muted small" id="immich-env" hidden></p>
     <p class="muted small" id="immich-intro">Forge needs your Immich address and an API key to read and save photos.</p>
     <form id="immich-form">
       <label for="url">Immich address</label>
@@ -114,7 +114,6 @@
 
       <label for="key">Immich API key</label>
       <input id="key" type="password" autocomplete="off">
-      <p class="small env-note" style="margin:4px 0 0" id="key-help" hidden></p>
 
       <p class="msg" id="immich-msg" hidden></p>
       <div class="row">
@@ -128,6 +127,7 @@
   <!-- Forge token: paste your own, copy, or generate any time -->
   <section id="token" hidden>
     <h2>Forge token <span class="meta" id="token-meta"></span></h2>
+    <p class="muted small" id="token-env" hidden>Set by container environment variable (FORGE_API_TOKEN).</p>
     <form id="token-form">
       <label for="token-input">Token</label>
       <div class="token-wrap">
@@ -380,7 +380,22 @@ async function checkImmich() {
   if (run !== immichCheck) return;  // a newer check started meanwhile
   setImmichStatus(result.ok ? 'ready' : 'not ready', result.ok ? 'ready' : 'not-ready');
   if (!result.ok) setMsg('immich-msg', result.message, 'bad');
+  else if (immichFromEnv()) setMsg('immich-msg', `✓ Connected to Immich as ${result.user}.`, 'ok');
 }
+
+// Both the address and key come from the container: nothing to edit or save.
+function immichFromEnv() {
+  return !!(config && config.from_env.immich_base_url && config.from_env.immich_api_key);
+}
+
+// 4. "Save changes" only when the address or key differs from what's saved.
+let savedUrl = '';
+function updateSaveButton() {
+  const changed = $('url').value.trim() !== savedUrl || $('key').value.trim() !== '';
+  $('save-btn').disabled = !changed;
+}
+$('url').addEventListener('input', updateSaveButton);
+$('key').addEventListener('input', updateSaveButton);
 
 function renderImmich() {
   const saved = status.immich_configured;
@@ -398,12 +413,15 @@ function renderImmich() {
     ? 'Paste your Immich API key'
     : keyFromEnv ? `${keyLabel}.` : `${keyLabel}. Enter a new key to replace it`;
   const envVars = [urlFromEnv && 'IMMICH_BASE_URL', keyFromEnv && 'IMMICH_API_KEY'].filter(Boolean);
-  $('key-help').textContent = envVars.length
+  $('immich-env').textContent = envVars.length
     ? `Set by container environment variable${envVars.length > 1 ? 's' : ''} (${envVars.join(' & ')}).`
     : '';
-  show('key-help', envVars.length > 0);
+  show('immich-env', envVars.length > 0);
   $('save-btn').textContent = saved ? 'Save changes' : 'Save';
-  $('save-btn').disabled = urlFromEnv && keyFromEnv;
+  // 2. Nothing to save when both come from the environment.
+  show('save-btn', !immichFromEnv());
+  savedUrl = saved ? (config.immich_base_url || '') : '';
+  updateSaveButton();
   show('save-anyway-btn', false);
   setMsg('immich-msg', '');
   if (saved) checkImmich();
@@ -454,7 +472,8 @@ function renderToken() {
   $('regen-btn').disabled = envToken;
   $('copy-token').disabled = !token;
   show('token-save', false); show('token-revert', false);
-  setMsg('token-msg', envToken ? 'Set by container environment variable (FORGE_API_TOKEN).' : '', 'warn');
+  show('token-env', envToken);
+  setMsg('token-msg', '');
 }
 
 function revealToken() {
