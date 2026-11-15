@@ -6,10 +6,24 @@ result and stacks it as the new primary asset.
 
 ## Run with Docker (GPU host)
 
-Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-The image is `linux/amd64` only (CUDA). On an Apple Silicon Mac, or any machine
-without an NVIDIA GPU, see the platform steps in [`DOCKERHUB.md`](DOCKERHUB.md)
-(`--platform linux/amd64` + `FORGE_DEVICE=cpu`).
+Quickest: the published image, no credentials needed (add `--gpus all` for an
+NVIDIA GPU; without one it uses the CPU automatically):
+
+```bash
+docker run -d --name immich-forge -p 8000:8000 \
+  -v immich-forge-weights:/app/weights --restart unless-stopped \
+  jamiekyu/immich-forge
+```
+
+The image is `linux/amd64` only (CUDA): on an Apple Silicon Mac add
+`--platform linux/amd64` (see [`DOCKERHUB.md`](DOCKERHUB.md) for each platform).
+`FORGE_DEVICE` defaults to `cuda`, and every stage falls back to the CPU when no
+GPU is available, so `FORGE_DEVICE=cpu` is only needed to force the CPU on a
+GPU machine.
+
+To build from source instead (requires the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+for GPU use):
 
 ```bash
 cp .env.example .env        # optional settings (GPU, backends); no credentials needed

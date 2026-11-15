@@ -19,73 +19,71 @@ You will also need the **[Forge for Immich](https://chromewebstore.google.com/de
 
 ### Step 1 — Start the server
 
-Pick the command for your computer. There's nothing to fill in: you'll connect Immich in step 2.
+**Quick start** — works on any Intel/AMD computer, with or without a GPU:
+
+```bash
+docker run -d --name immich-forge -p 8000:8000 \
+  -v immich-forge-weights:/app/weights --restart unless-stopped \
+  jamiekyu/immich-forge
+```
+
+Adjust for your computer:
 
 #### 🐧 Linux with an NVIDIA GPU (recommended)
 
-Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) first, then:
+Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), then add `--gpus all`:
 
 ```bash
 docker run -d --name immich-forge --gpus all -p 8000:8000 \
-  -v immich-forge-weights:/app/weights \
-  --restart unless-stopped \
-  jamiekyu/immich-forge:latest
+  -v immich-forge-weights:/app/weights --restart unless-stopped \
+  jamiekyu/immich-forge
 ```
 
-#### 🪟 Windows with an NVIDIA GPU
+#### 🪟 Windows with an NVIDIA GPU (recommended)
 
-Use [Docker Desktop](https://www.docker.com/products/docker-desktop/) (WSL 2 backend, the default) with a current NVIDIA driver; GPU support works out of the box
-<br>
-In PowerShell:
+Use [Docker Desktop](https://www.docker.com/products/docker-desktop/) (WSL 2 backend, the default) with a current NVIDIA driver. In PowerShell:
+
 ```powershell
 docker run -d --name immich-forge --gpus all -p 8000:8000 `
-  -v immich-forge-weights:/app/weights `
-  --restart unless-stopped `
-  jamiekyu/immich-forge:latest
+  -v immich-forge-weights:/app/weights --restart unless-stopped `
+  jamiekyu/immich-forge
 ```
 
 #### 🍎 Mac with Apple Silicon
 
-The image is built for Intel/AMD (`linux/amd64`) because it uses NVIDIA's CUDA. On an Apple Silicon Mac, Docker runs it through emulation, on the CPU:
-
-1. In **Docker Desktop → Settings → General**, turn on **"Use Rosetta for x86_64/amd64 emulation on Apple Silicon"** (much faster than the default emulation).
-2. Run it with `--platform linux/amd64` and `FORGE_DEVICE=cpu`:
+In **Docker Desktop → Settings → General**, turn on **"Use Rosetta for x86_64/amd64 emulation on Apple Silicon"** (much faster than the default emulation), then:
 
 ```bash
+docker pull --platform linux/amd64 jamiekyu/immich-forge
 docker run -d --name immich-forge --platform linux/amd64 -p 8000:8000 \
-  -e FORGE_DEVICE=cpu \
-  -v immich-forge-weights:/app/weights \
-  --restart unless-stopped \
-  jamiekyu/immich-forge:latest
+  -v immich-forge-weights:/app/weights --restart unless-stopped \
+  jamiekyu/immich-forge
 ```
 
-Without `--platform linux/amd64`, `docker pull` fails with *"no matching manifest for linux/arm64/v8"*. Expect enhancements to be **slow** (minutes per photo).
+Without `--platform linux/amd64`, Docker fails with *"no matching manifest for linux/arm64/v8"*. Expect enhancements to be **slow** (minutes per photo).
 
 #### 💻 Intel Mac, or any computer without an NVIDIA GPU
 
-Drop `--gpus all` and add `FORGE_DEVICE=cpu`. Runs on the CPU, so may be slow:
-
-```bash
-docker run -d --name immich-forge -p 8000:8000 \
-  -e FORGE_DEVICE=cpu \
-  -v immich-forge-weights:/app/weights \
-  --restart unless-stopped \
-  jamiekyu/immich-forge:latest
-```
+Use the quick start command as-is.
+<br>
+<br>
 
 ### Step 2 — Open the setup page
 
 In your browser, go to **`http://YOUR_FORGE_IP:8000`** (or `http://localhost:8000` on the same computer).
 
-- **AI models** download in the background on first start (**about 2.3 GB**, once). The page shows their progress; you can carry on with setup meanwhile.
+- **AI models** are downloaded in the background on first start (**about 2.3 GB**, once).
 - **Connect to Immich:**
   1. **Immich address** — the address you open Immich at, e.g. `http://192.168.1.50:2283`.
      <br>⚠️ Use the computer's **network IP address**, not `localhost`
   2. **Immich API key** — in Immich: **your avatar (top-right) → Account Settings → API Keys → New API Key**. Copy it.
   3. Click **Test connection**, then **Save**.
 - **Copy your Forge token.** Forge creates one when you save (or paste your own, 16+ characters) — you'll paste it into the extension.
-
-Come back to the same address any time — sign in with your Immich address and API key — to change the Immich connection, copy the token, or make a new one.
+<br>
+<br>
+Come back to the same address any time to manage server settings.
+<br>
+<br>
 
 ### Step 3 — Connect the Chrome extension
 
@@ -93,8 +91,11 @@ Come back to the same address any time — sign in with your Immich address and 
 2. Click the Forge toolbar icon → **Set up Forge server**.
 3. Enter the **server address** — `http://YOUR_FORGE_IP:8000` (or `http://localhost:8000` if Forge runs on the same computer as your browser) — and your **Forge token** from step 2, then click **Save & test**. Allow access when Chrome asks.
 4. Open any photo in Immich and click the Forge icon. 🎉
-
+<br>
+<br>
 Forging starts working once the AI models have finished downloading.
+<br>
+<br>
 
 ---
 
@@ -117,8 +118,6 @@ services:
     # platform: linux/amd64         # uncomment on Apple Silicon Macs
     ports:
       - "8000:8000"
-    environment:
-      FORGE_DEVICE: cuda             # change to cpu if you have no NVIDIA GPU
     volumes:
       - immich-forge-weights:/app/weights
     # Delete this "deploy" block if you have no NVIDIA GPU:
@@ -165,7 +164,7 @@ Set these with `-e NAME=value` (or under `environment:` in compose).
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `FORGE_DEVICE` | `cuda` | `cuda` (NVIDIA GPU) or `cpu`. |
+| `FORGE_DEVICE` | `cuda` | `cuda` uses an NVIDIA GPU when one is available, and the CPU otherwise — no change needed without a GPU. `cpu` forces the CPU even when a GPU is present. |
 
 **Connection (optional)** — normally set on the setup page. If you set them here instead, they're used as-is and shown on the page as read-only (handy for scripted installs).
 
