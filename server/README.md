@@ -17,6 +17,7 @@ docker run -d --name immich-forge -p 8000:8000 \
 
 The image is `linux/amd64` only (CUDA): on an Apple Silicon Mac add
 `--platform linux/amd64` (see [`DOCKERHUB.md`](DOCKERHUB.md) for each platform).
+GPU use needs NVIDIA driver 560 or newer (CUDA 12.6+; `nvidia-smi` shows both).
 `FORGE_DEVICE` defaults to `cuda`, and every stage falls back to the CPU when no
 GPU is available, so `FORGE_DEVICE=cpu` is only needed to force the CPU on a
 GPU machine.
