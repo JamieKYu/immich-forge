@@ -11,7 +11,9 @@ def load_checkpoint_state_dict(model_path: str, map_location="cpu"):
     - {'params': state_dict, ...} (common in this repo)
     - raw state_dict
     """
-    ckpt = torch.load(model_path, map_location=map_location)
+    # weights_only=False: trusted release artifact (pinned in app/models_download.py).
+    # Explicit because torch 2.6 flipped the default to True.
+    ckpt = torch.load(model_path, map_location=map_location, weights_only=False)
     if isinstance(ckpt, dict) and "params" in ckpt:
         return ckpt["params"]
     return ckpt
