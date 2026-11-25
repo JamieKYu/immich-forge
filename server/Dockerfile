@@ -20,8 +20,9 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # Torch built for the CUDA in the base image, then the model libs.
-# Pin the index URL to the matching CUDA version (cu124 here).
-RUN pip install torch==2.5.1 torchvision==0.20.1 \
+# Pin the index URL to the matching CUDA version (cu124 here). 2.6.0 is the
+# last torch release with cu124 wheels; newer torch needs a newer CUDA base.
+RUN pip install torch==2.6.0 torchvision==0.21.0 \
     --index-url https://download.pytorch.org/whl/cu124
 COPY requirements-ml.txt .
 # A failed install fails the build: an image without its models would quietly
