@@ -1,5 +1,7 @@
-# CUDA runtime base — provides the NVIDIA libraries Torch links against.
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+# CUDA runtime base. Ubuntu 24.04 ships Python 3.12 (numpy 2.5+ needs >= 3.12).
+# The torch wheels bring their own CUDA libraries, so the cu124 torch below runs
+# fine on this 12.6 base. The base image sets the minimum host driver (560+).
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -7,11 +9,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3-pip python3.11-dev \
+    python3.12 python3.12-venv \
     libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ln -sf /usr/bin/python3.11 /usr/bin/python && python -m pip install --upgrade pip
+# 24.04 doesn't allow system-wide pip installs (PEP 668), so install into a venv.
+# It's first on PATH, so `python`, `pip` and `uvicorn` all resolve to it.
+RUN python3.12 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+RUN python -m pip install --upgrade pip
 
 WORKDIR /app
 

@@ -48,11 +48,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Match the production runtime (the Dockerfile's base is Python 3.11).
+      # Match the production runtime (the Dockerfile's base ships Python 3.12).
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: pip
 
       # Core deps + test deps only. The heavy ML/GPU stack (requirements-ml.txt:
