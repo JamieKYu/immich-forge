@@ -18,4 +18,17 @@ facexlib==0.3.0
 
 # Denoising — SCUNet is vendored under app/pipeline/scunet/ (no basicsr/timm,
 # like ddcolor). einops is its only non-torch dependency.
-einops==0.8.0
+einops==0.8.2
+
+# Transitive deps, pinned so a rebuild only changes what we choose to change.
+# facexlib requires the full opencv-python (it and opencv-python-headless both
+# install cv2, and the last one installed wins), so pin it to the same version
+# as opencv-python-headless in requirements.txt.
+opencv-python==4.14.0.94
+# facexlib: numba (+ its llvmlite), scipy, filterpy, tqdm. spandrel: safetensors.
+numba==0.68.1
+llvmlite==0.50.0
+scipy==1.18.1
+filterpy==2.0.0
+tqdm==4.70.1
+safetensors==0.8.0
