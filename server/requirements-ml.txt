@@ -1,5 +1,5 @@
-# Heavy GPU / deep-learning deps. Installed in the Docker image on top of the
-# CUDA base. torch is pulled from the CUDA wheel index in the Dockerfile.
+# Heavy GPU / deep-learning deps. Installed in the Docker image after torch,
+# which comes from the CUDA wheel index in the Dockerfile.
 #
 # NOTE: DeOldify pins older fastai/torch and frequently conflicts with the
 # others. If you hit resolver conflicts, run colorization in its own container
@@ -9,9 +9,11 @@
 # and FBCNN (de-JPEG): the architecture is auto-detected from the checkpoint.
 spandrel==0.4.2
 
-# Face detection / alignment / paste-back for every face backend (faces.py).
+# Face detection / alignment / paste-back for every face backend (faces.py) is
+# facexlib, installed --no-deps from requirements-ml-nodeps.txt. Its
+# dependencies are listed below instead, minus opencv-python: the headless
+# build from requirements.txt is enough and needs no libGL/X11/Qt.
 # CodeFormer itself is vendored under app/pipeline/codeformer/.
-facexlib==0.3.0
 
 # Colorization
 # deoldify   # uncomment and pin against its required fastai/torch, ideally isolated
@@ -21,10 +23,6 @@ facexlib==0.3.0
 einops==0.8.2
 
 # Transitive deps, pinned so a rebuild only changes what we choose to change.
-# facexlib requires the full opencv-python (it and opencv-python-headless both
-# install cv2, and the last one installed wins), so pin it to the same version
-# as opencv-python-headless in requirements.txt.
-opencv-python==4.14.0.94
 # facexlib: numba (+ its llvmlite), scipy, filterpy, tqdm. spandrel: safetensors.
 numba==0.68.1
 llvmlite==0.50.0
@@ -32,3 +30,5 @@ scipy==1.18.1
 filterpy==2.0.0
 tqdm==4.70.1
 safetensors==0.8.0
+# torch: setuptools (it also bundles wheel, which must stay > 0.46.2).
+setuptools==84.2.1

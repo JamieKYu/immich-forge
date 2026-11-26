@@ -22,7 +22,8 @@ def normalize(in_channels):
     return torch.nn.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True)
 
 
-@torch.jit.script
+# Upstream decorated this with @torch.jit.script, which torch doesn't support
+# on Python 3.14+. Plain eager mode gives the same result.
 def swish(x):
     return x*torch.sigmoid(x)
 

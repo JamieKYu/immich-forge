@@ -7,7 +7,8 @@ pydantic-settings==2.16.3
 httpx==0.28.1
 python-multipart==0.0.34
 numpy==2.5.5
-# Keep in step with opencv-python in requirements-ml.txt (both provide cv2).
+# Headless only (no libGL/X11/Qt). facexlib is installed --no-deps so it
+# doesn't pull in the full opencv-python; see requirements-ml-nodeps.txt.
 opencv-python-headless==4.14.0.94
 pillow==13.0.0
 piexif==1.1.3

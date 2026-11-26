@@ -1,0 +1,5 @@
+# Installed with `pip install --no-deps`. facexlib requires the full
+# opencv-python, which bundles Qt and needs libGL/X11 system libraries; the
+# opencv-python-headless from requirements.txt provides the same cv2 module.
+# Its other dependencies are pinned in requirements-ml.txt.
+facexlib==0.3.0
