@@ -48,11 +48,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Match the production runtime (the Dockerfile's base ships Python 3.12).
+      # Match the production runtime (the Dockerfile's Ubuntu 26.04 base ships Python 3.14).
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
           cache: pip
 
       # Core deps + test deps only. The heavy ML/GPU stack (requirements-ml.txt:
@@ -209,7 +209,7 @@ jobs:
           context: ./server
           file: ./server/Dockerfile
           push: true
-          # CUDA base + cu124 Torch wheels are x86-64 only; no arm builds.
+          # The cu126 torch wheels are x86-64 only; no arm builds.
           platforms: linux/amd64
           # Both tags only ever push from an api-v tag, so :latest always points
           # at the newest server release.

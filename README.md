@@ -47,7 +47,7 @@ See [`server/README.md`](server/README.md) and
 
 Run the published server image (any Intel/AMD machine; add `--gpus all` to use
 an NVIDIA GPU, or `--platform linux/amd64` on an Apple Silicon Mac). GPU use
-needs NVIDIA driver 560 or newer (CUDA 12.6+):
+needs NVIDIA driver 525 or newer (any driver with CUDA 12 support):
 
 ```bash
 docker run -d --name immich-forge -p 8000:8000 \

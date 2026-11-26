@@ -31,7 +31,7 @@ Adjust for your computer:
 
 #### 🐧 Linux with an NVIDIA GPU (recommended)
 
-Requires NVIDIA driver 560 or newer (CUDA 12.6+; `nvidia-smi` shows both). Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), then add `--gpus all`:
+Requires NVIDIA driver 525 or newer (CUDA 12+; `nvidia-smi` shows both). Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), then add `--gpus all`:
 
 ```bash
 docker run -d --name immich-forge --gpus all -p 8000:8000 \
@@ -41,7 +41,7 @@ docker run -d --name immich-forge --gpus all -p 8000:8000 \
 
 #### 🪟 Windows with an NVIDIA GPU (recommended)
 
-Use [Docker Desktop](https://www.docker.com/products/docker-desktop/) (WSL 2 backend, the default) with NVIDIA driver 560 or newer (CUDA 12.6+). In PowerShell:
+Use [Docker Desktop](https://www.docker.com/products/docker-desktop/) (WSL 2 backend, the default) with NVIDIA driver 528 or newer (CUDA 12+). In PowerShell:
 
 ```powershell
 docker run -d --name immich-forge --gpus all -p 8000:8000 `
